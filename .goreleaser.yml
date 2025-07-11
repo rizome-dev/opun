@@ -1,0 +1,179 @@
+project_name: opun
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - id: opun
+    main: ./cmd/opun
+    binary: opun
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.buildTime={{.Date}}
+
+archives:
+  - id: opun
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - '^build:'
+      - '^style:'
+      - '^refactor:'
+      - '^perf:'
+      - '^chore:'
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: 'Features'
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 0
+    - title: 'Bug fixes'
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 1
+    - title: 'Documentation'
+      regexp: "^.*docs[(\\w)]*:+.*$"
+      order: 2
+    - title: 'Other'
+      order: 999
+
+release:
+  github:
+    owner: rizome-dev
+    name: opun
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## Opun {{ .Tag }}
+    
+    AI code agent automation framework for managing Claude Code and Gemini CLI sessions.
+    
+  footer: |
+    ## Installation
+    
+    ### Homebrew (macOS/Linux)
+    ```bash
+    brew tap rizome-dev/brews
+    brew install opun
+    ```
+    
+    ### Script (macOS/Linux)
+    ```bash
+    curl -sSL https://raw.githubusercontent.com/rizome-dev/opun/main/install.sh | bash
+    ```
+    
+    ### Manual
+    Download the appropriate binary for your platform from the assets below.
+    
+    ## Quick Start
+    ```bash
+    # Initial setup
+    opun setup
+    
+    # Run a workflow
+    opun run myworkflow
+    
+    # Start interactive chat
+    opun chat claude
+    ```
+    
+    **Full Documentation**: https://github.com/rizome-dev/opun
+
+brews:
+  - name: opun
+    homepage: https://github.com/rizome-dev/opun
+    description: AI code agent automation framework
+    license: MIT
+    repository:
+      owner: rizome-dev
+      name: brews
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    folder: Formula
+    test: |
+      system "#{bin}/opun", "--version"
+    install: |
+      bin.install "opun"
+      
+      # Generate and install shell completions
+      generate_completions_from_executable(bin/"opun", "completion")
+
+dockers:
+  - image_templates:
+      - "ghcr.io/rizome-dev/{{ .ProjectName }}:{{ .Version }}-amd64"
+      - "ghcr.io/rizome-dev/{{ .ProjectName }}:latest-amd64"
+    use: buildx
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--build-arg=VERSION={{.Version}}"
+      - "--build-arg=COMMIT={{.Commit}}"
+      - "--build-arg=BUILD_TIME={{.Date}}"
+  
+  - image_templates:
+      - "ghcr.io/rizome-dev/{{ .ProjectName }}:{{ .Version }}-arm64"
+      - "ghcr.io/rizome-dev/{{ .ProjectName }}:latest-arm64"
+    use: buildx
+    goarch: arm64
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--build-arg=VERSION={{.Version}}"
+      - "--build-arg=COMMIT={{.Commit}}"
+      - "--build-arg=BUILD_TIME={{.Date}}"
+
+docker_manifests:
+  - name_template: "ghcr.io/rizome-dev/{{ .ProjectName }}:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/rizome-dev/{{ .ProjectName }}:{{ .Version }}-amd64"
+      - "ghcr.io/rizome-dev/{{ .ProjectName }}:{{ .Version }}-arm64"
+  
+  - name_template: "ghcr.io/rizome-dev/{{ .ProjectName }}:latest"
+    image_templates:
+      - "ghcr.io/rizome-dev/{{ .ProjectName }}:latest-amd64"
+      - "ghcr.io/rizome-dev/{{ .ProjectName }}:latest-arm64"

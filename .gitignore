@@ -1,32 +1,141 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
+workflow*/
+.claude/
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+opun
+!cmd/opun/
 
 # Test binary, built with `go test -c`
 *.test
 
-# Code coverage profiles and other test artifacts
+# Output of the go coverage tool
 *.out
-coverage.*
-*.coverprofile
-profile.cov
-
-# Dependency directories (remove the comment below to include it)
-# vendor/
+coverage.html
+coverage.xml
 
 # Go workspace file
 go.work
-go.work.sum
 
-# env file
+# Dependency directories
+vendor/
+
+# Build directories
+build/
+dist/
+bin/
+release/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+*.sublime-workspace
+*.sublime-project
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment files
 .env
+.env.local
+.env.*.local
+*.env
 
-# Editor/IDE
-# .idea/
-# .vscode/
+# Log files
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Test outputs
+internal/workflow/test-outputs/
+test-outputs/
+**/test-outputs/
+sessions/
+sessions.log
+
+# Opun specific
+refactor-sessions/
+.opun/
+*.opun.yaml
+!example.opun.yaml
+
+# Local configuration
+config.local.yaml
+config.local.yml
+
+# Certificates
+*.pem
+*.key
+*.crt
+*.csr
+
+# Archives
+*.zip
+*.tar.gz
+*.tar
+*.gz
+*.rar
+
+# Profiling
+*.prof
+*.mem
+*.cpu
+
+# Debug files
+debug
+__debug_bin
+
+# GoReleaser
+dist/
+
+# Shell completion files (generated)
+completions/
+
+# Documentation build
+docs/_build/
+docs/_site/
+site/
+
+# Python (for any scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+ENV/
+
+# Node (for any web UI)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Terraform (for infrastructure)
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Misc
+.cache/
+.history/

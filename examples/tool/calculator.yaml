@@ -1,0 +1,67 @@
+name: calculator
+description: "Perform basic arithmetic calculations"
+
+# Tool schema for MCP server
+input_schema:
+  type: object
+  properties:
+    operation:
+      type: string
+      enum: ["add", "subtract", "multiply", "divide"]
+      description: "The arithmetic operation to perform"
+    a:
+      type: number
+      description: "First operand"
+    b:
+      type: number
+      description: "Second operand"
+  required: ["operation", "a", "b"]
+
+output_schema:
+  type: object
+  properties:
+    result:
+      type: number
+      description: "The result of the calculation"
+    expression:
+      type: string
+      description: "The expression that was evaluated"
+
+# Implementation (for reference - actual implementation would be in MCP server)
+implementation:
+  type: "javascript"
+  code: |
+    function calculate(input) {
+      const { operation, a, b } = input;
+      let result;
+      let symbol;
+      
+      switch (operation) {
+        case 'add':
+          result = a + b;
+          symbol = '+';
+          break;
+        case 'subtract':
+          result = a - b;
+          symbol = '-';
+          break;
+        case 'multiply':
+          result = a * b;
+          symbol = '*';
+          break;
+        case 'divide':
+          if (b === 0) {
+            throw new Error('Division by zero');
+          }
+          result = a / b;
+          symbol = '/';
+          break;
+        default:
+          throw new Error('Invalid operation');
+      }
+      
+      return {
+        result,
+        expression: `${a} ${symbol} ${b} = ${result}`
+      };
+    }

@@ -1,0 +1,58 @@
+name: example-toolkit
+version: 1.0.0
+description: Example toolkit manifest that demonstrates remote distribution of prompts, workflows and actions
+author: "Opun Examples"
+
+imports:
+  prompts:
+    - name: code-review
+      description: "Perform a thorough code review"
+      content: |
+        Please perform a comprehensive code review of the provided code.
+        Focus on:
+        - Code quality and readability
+        - Potential bugs or issues
+        - Performance considerations
+        - Security vulnerabilities
+        - Best practices
+      tags: ["code-review", "quality"]
+    
+    - name: refactor-suggestions
+      description: "Suggest refactoring improvements"
+      content: |
+        Analyze the code and suggest refactoring improvements.
+        Consider:
+        - Design patterns that could be applied
+        - Code duplication that could be eliminated
+        - Complexity that could be reduced
+        - Naming improvements
+      tags: ["refactoring", "improvement"]
+
+  workflows:
+    - name: code-analysis
+      description: "Complete code analysis workflow"
+      agents:
+        - name: review
+          prompt: "@code-review"
+          provider: claude
+          model: sonnet
+        - name: refactor
+          prompt: "@refactor-suggestions"
+          provider: claude
+          model: sonnet
+          depends_on: [review]
+
+  actions:
+    - name: format-code
+      description: "Format code using standard tools"
+      type: script
+      script: |
+        #!/bin/bash
+        # Format Go code
+        if [[ "$1" == *.go ]]; then
+          gofmt -w "$1"
+        fi
+        # Format Python code
+        if [[ "$1" == *.py ]]; then
+          black "$1" 2>/dev/null || python -m black "$1"
+        fi

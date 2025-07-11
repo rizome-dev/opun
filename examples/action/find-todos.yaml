@@ -1,0 +1,17 @@
+id: find-todos
+name: Find TODOs
+description: Search for TODO comments in code files
+category: development
+
+# Direct command execution using ripgrep
+command: "rg --type-add 'code:*.{js,ts,go,py,java,rs,cpp,c,h}' -t code 'TODO|FIXME|HACK|XXX|BUG' -n"
+
+# Make available to all providers
+providers:
+  - claude
+  - gemini
+
+# Additional configuration
+config:
+  case_sensitive: false
+  include_line_numbers: true

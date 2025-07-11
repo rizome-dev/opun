@@ -1,0 +1,764 @@
+package plugin
+
+import (
+	"bufio"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"github.com/rizome-dev/opun/pkg/plugin"
+)
+
+// ScriptPlugin implements script-based plugins (Python, JavaScript, etc.)
+type ScriptPlugin struct {
+	manifest   *plugin.PluginManifest
+	pluginDir  string
+	config     plugin.PluginConfig
+	process    *exec.Cmd
+	stdin      io.WriteCloser
+	stdout     io.ReadCloser
+	stderr     io.ReadCloser
+	reader     *bufio.Reader
+	mu         sync.Mutex
+	running    bool
+	requestID  int
+	pending    map[int]chan *ScriptResponse
+}
+
+// ScriptRequest represents a request to the script plugin
+type ScriptRequest struct {
+	ID        int                    `json:"id"`
+	Method    string                 `json:"method"`
+	Params    map[string]interface{} `json:"params,omitempty"`
+	Command   string                 `json:"command,omitempty"`
+	Tool      string                 `json:"tool,omitempty"`
+	Arguments map[string]interface{} `json:"arguments,omitempty"`
+	ToolInput map[string]interface{} `json:"tool_input,omitempty"`
+}
+
+// ScriptResponse represents a response from the script plugin
+type ScriptResponse struct {
+	ID     int                    `json:"id"`
+	Result interface{}            `json:"result,omitempty"`
+	Error  *ScriptError           `json:"error,omitempty"`
+	Status string                 `json:"status,omitempty"`
+}
+
+// ScriptError represents an error from the script plugin
+type ScriptError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+// NewScriptPlugin creates a new script plugin
+func NewScriptPlugin(manifest *plugin.PluginManifest, pluginDir string) *ScriptPlugin {
+	return &ScriptPlugin{
+		manifest:  manifest,
+		pluginDir: filepath.Join(pluginDir, manifest.Name),
+		pending:   make(map[int]chan *ScriptResponse),
+	}
+}
+
+// Plugin interface implementation
+
+func (p *ScriptPlugin) Name() string {
+	return p.manifest.Name
+}
+
+func (p *ScriptPlugin) Version() string {
+	return p.manifest.Version
+}
+
+func (p *ScriptPlugin) Description() string {
+	return p.manifest.Description
+}
+
+func (p *ScriptPlugin) Author() string {
+	return p.manifest.Author
+}
+
+func (p *ScriptPlugin) Initialize(config plugin.PluginConfig) error {
+	p.config = config
+	return nil
+}
+
+func (p *ScriptPlugin) Start(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.running {
+		return fmt.Errorf("plugin already running")
+	}
+
+	// Prepare the command based on runtime
+	var cmd *exec.Cmd
+	scriptPath := filepath.Join(p.pluginDir, p.manifest.EntryPoint)
+
+	switch p.manifest.Runtime {
+	case plugin.RuntimePython:
+		// Check for Python availability
+		pythonCmd := "python3"
+		if _, err := exec.LookPath(pythonCmd); err != nil {
+			pythonCmd = "python"
+			if _, err := exec.LookPath(pythonCmd); err != nil {
+				return fmt.Errorf("Python not found in PATH")
+			}
+		}
+		cmd = exec.CommandContext(ctx, pythonCmd, scriptPath)
+
+	case plugin.RuntimeJavaScript:
+		// Check for Node.js availability
+		if _, err := exec.LookPath("node"); err != nil {
+			return fmt.Errorf("Node.js not found in PATH")
+		}
+		cmd = exec.CommandContext(ctx, "node", scriptPath)
+
+	default:
+		return fmt.Errorf("unsupported runtime: %s", p.manifest.Runtime)
+	}
+
+	// Set working directory to plugin directory
+	cmd.Dir = p.pluginDir
+
+	// Set environment variables
+	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("OPUN_PLUGIN_NAME=%s", p.manifest.Name),
+		fmt.Sprintf("OPUN_PLUGIN_VERSION=%s", p.manifest.Version),
+		fmt.Sprintf("OPUN_PLUGIN_DIR=%s", p.pluginDir),
+	)
+
+	// Create pipes for communication
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create stdin pipe: %w", err)
+	}
+	p.stdin = stdin
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+	p.stdout = stdout
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create stderr pipe: %w", err)
+	}
+	p.stderr = stderr
+
+	// Start the process
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start plugin process: %w", err)
+	}
+
+	p.process = cmd
+	p.reader = bufio.NewReader(stdout)
+	p.running = true
+
+	// Start response handler
+	go p.handleResponses()
+
+	// Start stderr logger
+	go p.logStderr()
+
+	// Send initialize request
+	initReq := &ScriptRequest{
+		ID:     p.nextRequestID(),
+		Method: "initialize",
+		Params: map[string]interface{}{
+			"config": p.config,
+		},
+	}
+
+	resp, err := p.sendRequest(initReq)
+	if err != nil {
+		p.Stop(context.Background())
+		return fmt.Errorf("failed to initialize plugin: %w", err)
+	}
+
+	if resp.Error != nil {
+		p.Stop(context.Background())
+		return fmt.Errorf("plugin initialization error: %s", resp.Error.Message)
+	}
+
+	// Send start lifecycle event
+	startReq := &ScriptRequest{
+		ID:     p.nextRequestID(),
+		Method: "start",
+	}
+
+	resp, err = p.sendRequest(startReq)
+	if err != nil {
+		p.Stop(context.Background())
+		return fmt.Errorf("failed to start plugin: %w", err)
+	}
+
+	if resp.Error != nil {
+		p.Stop(context.Background())
+		return fmt.Errorf("plugin start error: %s", resp.Error.Message)
+	}
+
+	return nil
+}
+
+func (p *ScriptPlugin) Stop(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if !p.running {
+		return nil
+	}
+
+	// Send stop lifecycle event
+	stopReq := &ScriptRequest{
+		ID:     p.nextRequestID(),
+		Method: "stop",
+	}
+
+	// Try to gracefully stop
+	if err := p.sendRequestNoWait(stopReq); err == nil {
+		// Give it a moment to clean up
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	// Close stdin to signal the process to exit
+	if p.stdin != nil {
+		p.stdin.Close()
+	}
+
+	// Wait for process to exit or timeout
+	done := make(chan error, 1)
+	go func() {
+		if p.process != nil {
+			done <- p.process.Wait()
+		} else {
+			done <- nil
+		}
+	}()
+
+	select {
+	case <-done:
+		// Process exited cleanly
+	case <-time.After(5 * time.Second):
+		// Force kill after timeout
+		if p.process != nil {
+			p.process.Process.Kill()
+		}
+	}
+
+	// Close other pipes
+	if p.stdout != nil {
+		p.stdout.Close()
+	}
+	if p.stderr != nil {
+		p.stderr.Close()
+	}
+
+	p.running = false
+	p.process = nil
+
+	return nil
+}
+
+func (p *ScriptPlugin) Execute(ctx context.Context, input plugin.PluginInput) (plugin.PluginOutput, error) {
+	if !p.running {
+		return plugin.PluginOutput{}, fmt.Errorf("plugin not running")
+	}
+
+	// Create request based on input type
+	req := &ScriptRequest{
+		ID:     p.nextRequestID(),
+		Method: "execute",
+	}
+
+	if input.Command != "" {
+		req.Command = input.Command
+		req.Arguments = input.Arguments
+	} else {
+		return plugin.PluginOutput{}, fmt.Errorf("no command specified")
+	}
+
+	// Send request and wait for response
+	resp, err := p.sendRequest(req)
+	if err != nil {
+		return plugin.PluginOutput{}, err
+	}
+
+	if resp.Error != nil {
+		return plugin.PluginOutput{
+			Success: false,
+			Error:   resp.Error.Message,
+		}, nil
+	}
+
+	// Convert response to PluginOutput
+	resultBytes, err := json.Marshal(resp.Result)
+	if err != nil {
+		return plugin.PluginOutput{}, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	var output plugin.PluginOutput
+	if err := json.Unmarshal(resultBytes, &output); err != nil {
+		// If it doesn't unmarshal to PluginOutput, wrap the result
+		output = plugin.PluginOutput{
+			Success: true,
+			Result:  resp.Result,
+		}
+	}
+
+	return output, nil
+}
+
+func (p *ScriptPlugin) GetCommands() []plugin.CommandDefinition {
+	return p.manifest.Commands
+}
+
+func (p *ScriptPlugin) GetTools() []plugin.ToolDefinition {
+	return p.manifest.Tools
+}
+
+func (p *ScriptPlugin) GetProviders() []plugin.ProviderDefinition {
+	return p.manifest.Providers
+}
+
+// Internal methods
+
+func (p *ScriptPlugin) nextRequestID() int {
+	p.requestID++
+	return p.requestID
+}
+
+func (p *ScriptPlugin) sendRequest(req *ScriptRequest) (*ScriptResponse, error) {
+	p.mu.Lock()
+	
+	// Create response channel
+	respChan := make(chan *ScriptResponse, 1)
+	p.pending[req.ID] = respChan
+	
+	// Send request
+	data, err := json.Marshal(req)
+	if err != nil {
+		delete(p.pending, req.ID)
+		p.mu.Unlock()
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	if _, err := p.stdin.Write(append(data, '\n')); err != nil {
+		delete(p.pending, req.ID)
+		p.mu.Unlock()
+		return nil, fmt.Errorf("failed to write request: %w", err)
+	}
+
+	p.mu.Unlock()
+
+	// Wait for response with timeout
+	select {
+	case resp := <-respChan:
+		return resp, nil
+	case <-time.After(30 * time.Second):
+		p.mu.Lock()
+		delete(p.pending, req.ID)
+		p.mu.Unlock()
+		return nil, fmt.Errorf("request timeout")
+	}
+}
+
+func (p *ScriptPlugin) sendRequestNoWait(req *ScriptRequest) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	data, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	if _, err := p.stdin.Write(append(data, '\n')); err != nil {
+		return fmt.Errorf("failed to write request: %w", err)
+	}
+
+	return nil
+}
+
+func (p *ScriptPlugin) handleResponses() {
+	for p.running {
+		line, err := p.reader.ReadString('\n')
+		if err != nil {
+			if err != io.EOF {
+				fmt.Fprintf(os.Stderr, "Script plugin %s: error reading response: %v\n", p.manifest.Name, err)
+			}
+			break
+		}
+
+		var resp ScriptResponse
+		if err := json.Unmarshal([]byte(line), &resp); err != nil {
+			fmt.Fprintf(os.Stderr, "Script plugin %s: invalid response: %s\n", p.manifest.Name, line)
+			continue
+		}
+
+		// Find pending request
+		p.mu.Lock()
+		if ch, ok := p.pending[resp.ID]; ok {
+			delete(p.pending, resp.ID)
+			ch <- &resp
+			close(ch)
+		}
+		p.mu.Unlock()
+	}
+}
+
+func (p *ScriptPlugin) logStderr() {
+	scanner := bufio.NewScanner(p.stderr)
+	for scanner.Scan() {
+		fmt.Fprintf(os.Stderr, "Script plugin %s: %s\n", p.manifest.Name, scanner.Text())
+	}
+}
+
+// Python plugin protocol helper
+func GeneratePythonPluginStub() string {
+	return `#!/usr/bin/env python3
+"""
+Opun Plugin Protocol Implementation for Python
+"""
+
+import json
+import sys
+import os
+from typing import Dict, Any, Optional, List
+from abc import ABC, abstractmethod
+
+
+class PluginBase(ABC):
+    """Base class for Opun Python plugins"""
+    
+    def __init__(self):
+        self.config = {}
+        self.event_bus = None
+    
+    @abstractmethod
+    def initialize(self, config: Dict[str, Any]) -> None:
+        """Initialize the plugin with configuration"""
+        pass
+    
+    @abstractmethod
+    def start(self) -> None:
+        """Start the plugin"""
+        pass
+    
+    @abstractmethod
+    def stop(self) -> None:
+        """Stop the plugin and cleanup"""
+        pass
+    
+    @abstractmethod
+    def execute(self, command: Optional[str], tool: Optional[str], 
+                arguments: Dict[str, Any], tool_input: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a command or tool"""
+        pass
+
+
+class PluginProtocol:
+    """Handles the JSON-RPC style communication protocol"""
+    
+    def __init__(self, plugin: PluginBase):
+        self.plugin = plugin
+        self.running = True
+    
+    def run(self):
+        """Main message loop"""
+        while self.running:
+            try:
+                line = sys.stdin.readline()
+                if not line:
+                    break
+                
+                request = json.loads(line.strip())
+                response = self.handle_request(request)
+                
+                if response:
+                    print(json.dumps(response), flush=True)
+            
+            except json.JSONDecodeError as e:
+                self.send_error(0, f"Invalid JSON: {e}")
+            except Exception as e:
+                self.send_error(0, f"Unexpected error: {e}")
+    
+    def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle a single request"""
+        request_id = request.get('id', 0)
+        method = request.get('method', '')
+        
+        try:
+            if method == 'initialize':
+                config = request.get('params', {}).get('config', {})
+                self.plugin.initialize(config)
+                return {'id': request_id, 'status': 'initialized'}
+            
+            elif method == 'start':
+                self.plugin.start()
+                return {'id': request_id, 'status': 'started'}
+            
+            elif method == 'stop':
+                self.plugin.stop()
+                self.running = False
+                return {'id': request_id, 'status': 'stopped'}
+            
+            elif method == 'execute':
+                result = self.plugin.execute(
+                    command=request.get('command'),
+                    tool=request.get('tool'),
+                    arguments=request.get('arguments', {}),
+                    tool_input=request.get('tool_input', {})
+                )
+                return {'id': request_id, 'result': result}
+            
+            else:
+                return {
+                    'id': request_id, 
+                    'error': {'code': -32601, 'message': f'Unknown method: {method}'}
+                }
+        
+        except Exception as e:
+            return {
+                'id': request_id,
+                'error': {'code': -32603, 'message': str(e)}
+            }
+    
+    def send_error(self, request_id: int, message: str):
+        """Send an error response"""
+        response = {
+            'id': request_id,
+            'error': {'code': -32603, 'message': message}
+        }
+        print(json.dumps(response), flush=True)
+
+
+# Helper classes
+class PluginInput:
+    """Represents input to a plugin execution"""
+    def __init__(self, command: Optional[str] = None, tool: Optional[str] = None,
+                 arguments: Optional[Dict[str, Any]] = None, 
+                 tool_input: Optional[Dict[str, Any]] = None):
+        self.command = command
+        self.tool = tool
+        self.arguments = arguments or {}
+        self.tool_input = tool_input or {}
+
+
+class PluginOutput:
+    """Represents output from a plugin execution"""
+    def __init__(self, result: Any = None, success: bool = True, error: Optional[str] = None):
+        self.result = result
+        self.success = success
+        self.error = error
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization"""
+        output = {'success': self.success}
+        if self.result is not None:
+            output['result'] = self.result
+        if self.error:
+            output['error'] = self.error
+        return output
+
+
+# Decorator for registering handlers
+def register_handler(name: str):
+    """Decorator to register a method as a handler for a command/tool"""
+    def decorator(func):
+        func._handler_name = name
+        return func
+    return decorator
+`
+}
+
+// JavaScript plugin protocol helper
+func GenerateJavaScriptPluginStub() string {
+	return `#!/usr/bin/env node
+/**
+ * Opun Plugin Protocol Implementation for JavaScript/Node.js
+ */
+
+const readline = require('readline');
+
+/**
+ * Base class for Opun JavaScript plugins
+ */
+class PluginBase {
+    constructor() {
+        this.config = {};
+        this.eventBus = null;
+    }
+
+    /**
+     * Initialize the plugin with configuration
+     * @param {Object} config - Plugin configuration
+     */
+    async initialize(config) {
+        throw new Error('initialize() must be implemented');
+    }
+
+    /**
+     * Start the plugin
+     */
+    async start() {
+        throw new Error('start() must be implemented');
+    }
+
+    /**
+     * Stop the plugin and cleanup
+     */
+    async stop() {
+        throw new Error('stop() must be implemented');
+    }
+
+    /**
+     * Execute a command or tool
+     * @param {Object} params - Execution parameters
+     * @returns {Object} - Execution result
+     */
+    async execute(params) {
+        throw new Error('execute() must be implemented');
+    }
+}
+
+/**
+ * Handles the JSON-RPC style communication protocol
+ */
+class PluginProtocol {
+    constructor(plugin) {
+        this.plugin = plugin;
+        this.running = true;
+        this.rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+            terminal: false
+        });
+    }
+
+    /**
+     * Start the message loop
+     */
+    run() {
+        this.rl.on('line', async (line) => {
+            try {
+                const request = JSON.parse(line);
+                const response = await this.handleRequest(request);
+                
+                if (response) {
+                    console.log(JSON.stringify(response));
+                }
+            } catch (error) {
+                this.sendError(0, ` + "`Invalid JSON: ${error.message}`" + `);
+            }
+        });
+
+        this.rl.on('close', () => {
+            process.exit(0);
+        });
+    }
+
+    /**
+     * Handle a single request
+     */
+    async handleRequest(request) {
+        const { id = 0, method = '', params = {}, ...rest } = request;
+
+        try {
+            switch (method) {
+                case 'initialize':
+                    await this.plugin.initialize(params.config || {});
+                    return { id, status: 'initialized' };
+
+                case 'start':
+                    await this.plugin.start();
+                    return { id, status: 'started' };
+
+                case 'stop':
+                    await this.plugin.stop();
+                    this.running = false;
+                    return { id, status: 'stopped' };
+
+                case 'execute':
+                    const result = await this.plugin.execute({
+                        command: rest.command,
+                        tool: rest.tool,
+                        arguments: rest.arguments || {},
+                        toolInput: rest.tool_input || {}
+                    });
+                    return { id, result };
+
+                default:
+                    return {
+                        id,
+                        error: { code: -32601, message: ` + "`Unknown method: ${method}`" + ` }
+                    };
+            }
+        } catch (error) {
+            return {
+                id,
+                error: { code: -32603, message: error.message }
+            };
+        }
+    }
+
+    /**
+     * Send an error response
+     */
+    sendError(id, message) {
+        const response = {
+            id,
+            error: { code: -32603, message }
+        };
+        console.log(JSON.stringify(response));
+    }
+}
+
+/**
+ * Helper class for plugin input
+ */
+class PluginInput {
+    constructor({ command, tool, arguments: args, toolInput }) {
+        this.command = command;
+        this.tool = tool;
+        this.arguments = args || {};
+        this.toolInput = toolInput || {};
+    }
+}
+
+/**
+ * Helper class for plugin output
+ */
+class PluginOutput {
+    constructor({ result, success = true, error = null }) {
+        this.result = result;
+        this.success = success;
+        this.error = error;
+    }
+
+    toJSON() {
+        const output = { success: this.success };
+        if (this.result !== undefined) {
+            output.result = this.result;
+        }
+        if (this.error) {
+            output.error = this.error;
+        }
+        return output;
+    }
+}
+
+// Export for use in plugins
+module.exports = {
+    PluginBase,
+    PluginProtocol,
+    PluginInput,
+    PluginOutput
+};
+`
+}

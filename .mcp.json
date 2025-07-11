@@ -1,0 +1,33 @@
+{
+  "mcpServers": {
+    "context7": {
+      "args": [
+        "@upstash/context7-mcp"
+      ],
+      "command": "npx",
+      "type": "stdio"
+    },
+    "memory": {
+      "args": [
+        "@modelcontextprotocol/server-memory"
+      ],
+      "command": "npx",
+      "type": "stdio"
+    },
+    "opun": {
+      "args": [
+        "mcp",
+        "stdio"
+      ],
+      "command": "opun",
+      "type": "stdio"
+    },
+    "sequential-thinking": {
+      "args": [
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "command": "npx",
+      "type": "stdio"
+    }
+  }
+}
