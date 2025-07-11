@@ -18,6 +18,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/rizome-dev/opun/pkg/core"
@@ -87,7 +88,20 @@ func TestClaudeConfigTranslator_GetConfigPath(t *testing.T) {
 	translator := NewClaudeConfigTranslator()
 	path := translator.GetConfigPath()
 	// Path will be expanded, so check it contains the expected path components
-	assert.Contains(t, path, "Library/Application Support/Claude/claude_desktop_config.json")
+	// On macOS, it could be either the primary location or the fallback XDG location
+	validPaths := []string{
+		"Library/Application Support/Claude/claude_desktop_config.json",
+		".config/claude/claude_desktop_config.json",
+	}
+	
+	validPath := false
+	for _, expectedPath := range validPaths {
+		if strings.Contains(path, expectedPath) {
+			validPath = true
+			break
+		}
+	}
+	assert.True(t, validPath, "Path should contain one of the valid Claude config paths, got: %s", path)
 }
 
 func TestClaudeConfigTranslator_TranslateSlashCommands(t *testing.T) {
