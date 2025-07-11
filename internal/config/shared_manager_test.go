@@ -250,11 +250,15 @@ func TestSharedConfigManager_SyncToProvider(t *testing.T) {
 }
 
 func getClaudeConfigPaths(homeDir string) []string {
-	return []string{
+	paths := []string{
 		filepath.Join(homeDir, "Library", "Application Support", "Claude", "claude_desktop_config.json"), // macOS
-		filepath.Join(homeDir, ".config", "claude", "claude_desktop_config.json"),                      // Linux
+		filepath.Join(homeDir, ".config", "claude", "claude_desktop_config.json"),                      // Linux default
 		filepath.Join(homeDir, "AppData", "Roaming", "Claude", "claude_desktop_config.json"),             // Windows
 	}
+	if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
+		paths = append(paths, filepath.Join(xdgConfig, "claude", "claude_desktop_config.json"))
+	}
+	return paths
 }
 
 func TestSharedConfigManager_CheckMCPServerInstalled(t *testing.T) {
