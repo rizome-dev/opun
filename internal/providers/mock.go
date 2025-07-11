@@ -74,7 +74,8 @@ func (p *MockProvider) GetPTYCommand() (*exec.Cmd, error) {
 
 // GetPTYCommandWithPrompt returns a mock command with prompt
 func (p *MockProvider) GetPTYCommandWithPrompt(prompt string) (*exec.Cmd, error) {
-	// Echo the prompt as output
+	// Echo the prompt as output - using echo with proper argument separation
+	// #nosec G204 -- using echo command with separate argument, not shell interpretation
 	return exec.Command("echo", fmt.Sprintf("Mock response to: %s", prompt)), nil
 }
 

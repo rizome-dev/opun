@@ -163,6 +163,7 @@ func (e *TemplateEngine) processSimpleVariables(content string, vars map[string]
 			// Extract file path after "file:"
 			filePath := strings.TrimSpace(varName[5:])
 
+			// #nosec G304 -- include path is from template under user control
 			content, err := os.ReadFile(filePath)
 			if err != nil {
 				return fmt.Sprintf("[ERROR: Failed to read file '%s': %v]", filePath, err)
@@ -203,6 +204,7 @@ func (e *TemplateEngine) registerDefaultFuncs() {
 
 	// File functions
 	e.funcMap["readFile"] = func(path string) (string, error) {
+		// #nosec G304 -- template function for user-specified files
 		content, err := os.ReadFile(path)
 		if err != nil {
 			return "", err

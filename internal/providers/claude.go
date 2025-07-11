@@ -71,6 +71,7 @@ func (p *ClaudeProvider) Validate() error {
 // GetPTYCommand returns the command to start Claude
 func (p *ClaudeProvider) GetPTYCommand() (*exec.Cmd, error) {
 	config := p.Config()
+	// #nosec G204 -- executing configured provider command
 	cmd := exec.Command(config.Command, config.Args...)
 
 	// Apply injected environment if available

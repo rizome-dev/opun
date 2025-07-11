@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/rizome-dev/opun/internal/command"
 	"github.com/rizome-dev/opun/internal/plugin"
@@ -63,8 +64,12 @@ func (s *OpunMCPServer) Start(ctx context.Context) error {
 	mux.HandleFunc("/prompts/get", s.handlePromptsGet)
 
 	s.server = &http.Server{
-		Addr:    fmt.Sprintf("localhost:%d", s.port),
-		Handler: mux,
+		Addr:              fmt.Sprintf("localhost:%d", s.port),
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	go func() {
@@ -103,7 +108,9 @@ func (s *OpunMCPServer) handleRoot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode response: %v", err), http.StatusInternalServerError)
+	}
 }
 
 // handleTools returns all available tools (MCP tools, actions, commands)
@@ -195,7 +202,9 @@ func (s *OpunMCPServer) handleTools(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode response: %v", err), http.StatusInternalServerError)
+	}
 }
 
 // handleToolCall executes a tool
@@ -247,7 +256,9 @@ func (s *OpunMCPServer) handleToolCall(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode response: %v", err), http.StatusInternalServerError)
+	}
 }
 
 // executePrompt executes a prompt tool
@@ -332,28 +343,28 @@ func (s *OpunMCPServer) executeCommand(tool string, args map[string]interface{})
 func (s *OpunMCPServer) executeMCPTool(tool string, args map[string]interface{}) (string, error) {
 	// Extract tool name
 	toolName := strings.TrimPrefix(tool, "tool_")
-	
+
 	// Load tool definition
 	home, _ := os.UserHomeDir()
 	toolsDir := filepath.Join(home, ".opun", "tools")
 	toolPath := filepath.Join(toolsDir, toolName+".yaml")
-	
+
 	// Try .yml if .yaml doesn't exist
 	if _, err := os.Stat(toolPath); os.IsNotExist(err) {
 		toolPath = filepath.Join(toolsDir, toolName+".yml")
 	}
-	
+
 	// Read tool definition
 	data, err := os.ReadFile(toolPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read tool definition: %w", err)
 	}
-	
+
 	var toolDef map[string]interface{}
 	if err := yaml.Unmarshal(data, &toolDef); err != nil {
 		return "", fmt.Errorf("failed to parse tool definition: %w", err)
 	}
-	
+
 	// For now, just return a message indicating the tool was called
 	// In a real implementation, this would execute the tool's logic
 	return fmt.Sprintf("Executed MCP tool '%s' with arguments: %v", toolName, args), nil
@@ -493,7 +504,9 @@ func (s *OpunMCPServer) handlePromptsList(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode response: %v", err), http.StatusInternalServerError)
+	}
 }
 
 // handlePromptsGet returns a specific prompt's content
@@ -539,5 +552,7 @@ func (s *OpunMCPServer) handlePromptsGet(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode response: %v", err), http.StatusInternalServerError)
+	}
 }

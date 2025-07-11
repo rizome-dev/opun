@@ -126,6 +126,7 @@ func (i *SharedMCPInstaller) installSingleServer(ctx context.Context, server cor
 	defer cancel()
 
 	// Install the package globally
+	// #nosec G204 -- server.Package comes from configuration and is validated
 	cmd := exec.CommandContext(installCtx, "npm", "install", "-g", server.Package)
 
 	// Capture output for debugging

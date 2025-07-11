@@ -324,7 +324,7 @@ func (s *StdioMCPServer) handleToolsList(id interface{}) {
 
 							// Get input schema
 							inputSchema := map[string]interface{}{
-								"type": "object",
+								"type":       "object",
 								"properties": map[string]interface{}{},
 							}
 							if schema, ok := toolDef["input_schema"]; ok {
@@ -480,37 +480,37 @@ func (s *StdioMCPServer) executePlugin(tool string, args map[string]interface{})
 func (s *StdioMCPServer) executeMCPTool(tool string, args map[string]interface{}) (string, error) {
 	// Extract tool name
 	toolName := strings.TrimPrefix(tool, "tool_")
-	
+
 	// Load tool definition
 	home, _ := os.UserHomeDir()
 	toolsDir := filepath.Join(home, ".opun", "tools")
 	toolPath := filepath.Join(toolsDir, toolName+".yaml")
-	
+
 	// Try .yml if .yaml doesn't exist
 	if _, err := os.Stat(toolPath); os.IsNotExist(err) {
 		toolPath = filepath.Join(toolsDir, toolName+".yml")
 	}
-	
+
 	// Read tool definition
 	data, err := os.ReadFile(toolPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read tool definition: %w", err)
 	}
-	
+
 	var toolDef map[string]interface{}
 	if err := yaml.Unmarshal(data, &toolDef); err != nil {
 		return "", fmt.Errorf("failed to parse tool definition: %w", err)
 	}
-	
+
 	// Check if tool has implementation
 	impl, hasImpl := toolDef["implementation"].(map[string]interface{})
 	if !hasImpl {
 		return "", fmt.Errorf("tool %s has no implementation", toolName)
 	}
-	
+
 	// Get implementation type
 	implType, _ := impl["type"].(string)
-	
+
 	// For JavaScript tools, we need to simulate execution
 	// In a real implementation, this would use a JavaScript runtime
 	if implType == "javascript" {
@@ -519,10 +519,10 @@ func (s *StdioMCPServer) executeMCPTool(tool string, args map[string]interface{}
 			operation, _ := args["operation"].(string)
 			a, _ := args["a"].(float64)
 			b, _ := args["b"].(float64)
-			
+
 			var result float64
 			var symbol string
-			
+
 			switch operation {
 			case "add":
 				result = a + b
@@ -542,14 +542,14 @@ func (s *StdioMCPServer) executeMCPTool(tool string, args map[string]interface{}
 			default:
 				return "", fmt.Errorf("invalid operation: %s", operation)
 			}
-			
+
 			return fmt.Sprintf("%g %s %g = %g", a, symbol, b, result), nil
 		}
-		
+
 		// For other JavaScript tools, return a placeholder
 		return fmt.Sprintf("JavaScript tool '%s' execution not yet implemented", toolName), nil
 	}
-	
+
 	// For other tool types, just return a message
 	return fmt.Sprintf("Executed MCP tool '%s' with arguments: %v", toolName, args), nil
 }

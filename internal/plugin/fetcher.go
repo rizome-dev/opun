@@ -356,7 +356,10 @@ func (f *PluginFetcher) extractTarGz(archivePath, destDir string) error {
 				return err
 			}
 		case tar.TypeReg:
-			if err := f.extractTarFile(tr, path, os.FileMode(header.Mode)); err != nil {
+			// Safely convert int64 to uint32 for file mode
+			// Ensure the value fits in uint32 range
+			mode := os.FileMode(uint32(header.Mode) & 0777)
+			if err := f.extractTarFile(tr, path, mode); err != nil {
 				return err
 			}
 		}

@@ -127,7 +127,7 @@ func (e *InteractiveExecutor) executeInteractiveAgent(ctx context.Context, agent
 	e.mu.Unlock()
 
 	// Get provider command
-	providerCmd, err := e.getProviderCommand(agent.Provider)
+	providerCmd, providerArgs, err := e.getProviderCommandAndArgs(agent.Provider)
 	if err != nil {
 		return e.handleAgentError(agent, agentState, err)
 	}
@@ -138,8 +138,9 @@ func (e *InteractiveExecutor) executeInteractiveAgent(ctx context.Context, agent
 		return e.handleAgentError(agent, agentState, fmt.Errorf("failed to process prompt: %w", err))
 	}
 
-	// Create command
-	cmd := exec.Command("sh", "-c", providerCmd)
+	// Create command - use direct command instead of shell
+	// #nosec G204 -- providerCmd is from a hardcoded list of known AI provider commands
+	cmd := exec.Command(providerCmd, providerArgs...)
 	cmd.Env = os.Environ()
 
 	// Start PTY
@@ -240,28 +241,28 @@ func (e *InteractiveExecutor) processPromptWithHandoff(prompt string, agentIndex
 	return result, nil
 }
 
-// getProviderCommand returns the command to start a provider
-func (e *InteractiveExecutor) getProviderCommand(provider string) (string, error) {
+// getProviderCommandAndArgs returns the command and args to start a provider
+func (e *InteractiveExecutor) getProviderCommandAndArgs(provider string) (string, []string, error) {
 	switch provider {
 	case "claude":
 		// Try claude command first
 		if _, err := exec.LookPath("claude"); err == nil {
-			return "claude", nil
+			return "claude", []string{}, nil
 		}
 		// Fall back to npx claude-code
 		if _, err := exec.LookPath("npx"); err == nil {
-			return "npx claude-code", nil
+			return "npx", []string{"claude-code"}, nil
 		}
-		return "", fmt.Errorf("claude command not found, please install Claude CLI")
+		return "", nil, fmt.Errorf("claude command not found, please install Claude CLI")
 
 	case "gemini":
 		if _, err := exec.LookPath("gemini"); err == nil {
-			return "gemini", nil
+			return "gemini", []string{}, nil
 		}
-		return "", fmt.Errorf("gemini command not found, please install Gemini CLI")
+		return "", nil, fmt.Errorf("gemini command not found, please install Gemini CLI")
 
 	default:
-		return "", fmt.Errorf("unsupported provider: %s", provider)
+		return "", nil, fmt.Errorf("unsupported provider: %s", provider)
 	}
 }
 

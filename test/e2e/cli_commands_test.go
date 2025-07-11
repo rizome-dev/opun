@@ -27,6 +27,7 @@ import (
 	"github.com/rizome-dev/opun/internal/cli"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/term"
 )
 
 func TestCLICommands(t *testing.T) {
@@ -47,6 +48,11 @@ func TestCLICommands(t *testing.T) {
 	})
 
 	t.Run("Setup Command", func(t *testing.T) {
+		// Skip interactive setup test in CI environment
+		if os.Getenv("CI") == "true" || !isTerminal() {
+			t.Skip("Skipping interactive setup test in non-TTY environment")
+		}
+
 		// Create a mock stdin for setup interaction
 		mockStdin := bytes.NewBufferString("1\n") // Choose Claude
 		oldStdin := os.Stdin
@@ -95,10 +101,11 @@ This is a test prompt for {{name}}.`
 		require.NoError(t, err)
 
 		// Check that prompt was saved
-		gardenPath := filepath.Join(tempDir, ".opun", "promptgarden", "prompts")
+		gardenPath := filepath.Join(tempDir, ".opun", "promptgarden")
 		files, err := os.ReadDir(gardenPath)
 		require.NoError(t, err)
-		assert.Greater(t, len(files), 0)
+		// Should have at least one prompt file and index.json
+		assert.GreaterOrEqual(t, len(files), 2)
 	})
 
 	t.Run("Add Command - Workflow", func(t *testing.T) {
@@ -126,15 +133,24 @@ agents:
 	})
 
 	t.Run("List Command", func(t *testing.T) {
+		// Capture stdout since the list command prints directly
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
 		cmd := cli.RootCmd()
 		cmd.SetArgs([]string{"list"})
 
-		// Capture output
-		var buf bytes.Buffer
-		cmd.SetOut(&buf)
-
+		// Execute command
 		err := fang.Execute(context.Background(), cmd)
 		require.NoError(t, err)
+
+		// Close writer and read output
+		w.Close()
+		var buf bytes.Buffer
+		_, copyErr := buf.ReadFrom(r)
+		require.NoError(t, copyErr)
+		os.Stdout = oldStdout
 
 		output := buf.String()
 		assert.Contains(t, output, "📋 Workflows:")
@@ -173,10 +189,17 @@ agents:
 
 	t.Run("Run Workflow Command", func(t *testing.T) {
 		cmd := cli.RootCmd()
-		cmd.SetArgs([]string{"run", "test-workflow", "-o", filepath.Join(tempDir, "output")})
+		cmd.SetArgs([]string{"run", "test-workflow"})
 
 		// This will fail because we don't have a mock provider, but it tests the command structure
 		err := fang.Execute(context.Background(), cmd)
 		assert.Error(t, err) // Expected to fail without mock provider
 	})
+}
+
+// Helper functions
+
+// isTerminal checks if the current process is running in a terminal
+func isTerminal() bool {
+	return term.IsTerminal(int(os.Stdout.Fd()))
 }

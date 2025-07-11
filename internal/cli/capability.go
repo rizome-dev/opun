@@ -130,12 +130,12 @@ func listCapabilities(capType, provider string) error {
 							} else {
 								name = strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
 							}
-							
+
 							description := ""
 							if d, ok := toolDef["description"].(string); ok {
 								description = d
 							}
-							
+
 							fmt.Fprintf(w, "Tool\t%s\t%s\t%s\n",
 								name,
 								name,
@@ -216,7 +216,7 @@ func listCapabilities(capType, provider string) error {
 		}
 	}
 
-	w.Flush()
+	_ = w.Flush()
 	return nil
 }
 
@@ -274,12 +274,12 @@ func searchCapabilities(query, capType string) error {
 							} else {
 								name = strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
 							}
-							
+
 							description := ""
 							if d, ok := toolDef["description"].(string); ok {
 								description = d
 							}
-							
+
 							if matchesQuery(name, name, description, queryLower) {
 								fmt.Fprintf(w, "Tool\t%s\t%s\t%s\n",
 									name,
@@ -372,7 +372,7 @@ func searchCapabilities(query, capType string) error {
 		}
 	}
 
-	w.Flush()
+	_ = w.Flush()
 
 	if found == 0 {
 		fmt.Printf("No capabilities found matching '%s'\n", query)

@@ -40,6 +40,7 @@ func NewParser(workflowDir string) *Parser {
 
 // ParseFile parses a workflow from a YAML file
 func (p *Parser) ParseFile(filePath string) (*wf.Workflow, error) {
+	// #nosec G304 -- file path is provided by user for their workflow files
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read workflow file: %w", err)

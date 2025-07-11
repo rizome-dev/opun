@@ -43,7 +43,7 @@ by managing their interactive sessions and providing workflow orchestration.`,
 		},
 		// Override default help behavior to show our custom grouped commands
 		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
+			_ = cmd.Help()
 		},
 	}
 
@@ -86,9 +86,9 @@ Simply type opun help [path to command] for full details.`,
 			cmd, _, e := c.Root().Find(args)
 			if cmd == nil || e != nil {
 				c.Printf("Unknown help topic %#q\n", args)
-				c.Root().Usage()
+				_ = c.Root().Usage()
 			} else {
-				cmd.Help()
+				_ = cmd.Help()
 			}
 		},
 	})
@@ -276,7 +276,7 @@ func initConfig(configFile string) error {
 	viper.AutomaticEnv()
 
 	// Read config if it exists
-	viper.ReadInConfig()
+	_ = viper.ReadInConfig()
 
 	return nil
 }
@@ -310,7 +310,7 @@ func checkAndWarnPermissions(opunDir string) error {
 	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
 		return fmt.Errorf("cannot write to ~/.opun directory. Run 'make fix-permissions' or 'sudo chown -R %s ~/.opun'", actualUser.Username)
 	}
-	os.Remove(testFile)
+	_ = os.Remove(testFile)
 
 	return nil
 }

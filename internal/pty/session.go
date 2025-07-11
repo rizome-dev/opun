@@ -53,6 +53,9 @@ type SessionConfig struct {
 
 // NewSession creates a new PTY session
 func NewSession(config SessionConfig) (*Session, error) {
+	// Execute the command - this is a framework function that accepts commands by design
+	// The command should be validated by the caller
+	// #nosec G204 -- framework function that executes configured commands
 	cmd := exec.Command(config.Command, config.Args...)
 
 	if config.WorkingDir != "" {

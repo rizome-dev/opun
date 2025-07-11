@@ -117,7 +117,7 @@ func runWorkflow(name string, vars map[string]string) error {
 		// Ensure terminal is restored
 		if term.IsTerminal(int(os.Stdin.Fd())) {
 			// Try to restore terminal state
-			exec.Command("stty", "sane").Run()
+			_ = exec.Command("stty", "sane").Run()
 		}
 		os.Exit(1)
 	}()
@@ -126,7 +126,7 @@ func runWorkflow(name string, vars map[string]string) error {
 	if err := executor.Execute(ctx, wf, variables); err != nil {
 		// Ensure terminal is restored
 		if term.IsTerminal(int(os.Stdin.Fd())) {
-			exec.Command("stty", "sane").Run()
+			_ = exec.Command("stty", "sane").Run()
 		}
 		return fmt.Errorf("workflow execution failed: %w", err)
 	}

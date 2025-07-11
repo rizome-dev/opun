@@ -123,19 +123,23 @@ func showWorkflows() error {
 		if err == nil {
 			// Simple extraction of description from YAML
 			lines := strings.Split(string(data), "\n")
+			foundDesc := false
 			for _, line := range lines {
 				if strings.HasPrefix(line, "description:") {
 					desc := strings.TrimSpace(strings.TrimPrefix(line, "description:"))
 					desc = strings.Trim(desc, "\"'")
 					fmt.Printf("  /%s - %s\n", name, desc)
-					workflowCount++
+					foundDesc = true
 					break
 				}
 			}
+			if !foundDesc {
+				fmt.Printf("  /%s\n", name)
+			}
 		} else {
 			fmt.Printf("  /%s\n", name)
-			workflowCount++
 		}
+		workflowCount++
 	}
 
 	if workflowCount == 0 {

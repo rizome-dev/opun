@@ -59,6 +59,8 @@ func (te *ToolExecutor) ExecuteCommand(ctx context.Context, command string, args
 	timeoutCtx, cancel := context.WithTimeout(ctx, te.timeout)
 	defer cancel()
 
+	// Execute command - cmdName comes from tool configuration, not user input
+	// #nosec G204 -- command is from trusted tool configuration
 	cmd := exec.CommandContext(timeoutCtx, cmdName, cmdArgs...)
 	cmd.Dir = te.workingDir
 

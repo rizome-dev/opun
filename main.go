@@ -24,6 +24,8 @@ import (
 
 func main() {
 	// Run the actual command from cmd/opun
+	// This is a development helper that passes arguments to go run
+	// #nosec G204 -- development helper, not used in production
 	cmd := exec.Command("go", append([]string{"run", "./cmd/opun"}, os.Args[1:]...)...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

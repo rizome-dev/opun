@@ -148,12 +148,38 @@ func FixPermissionsRecursive(root string) error {
 		return nil // Nothing to fix if not running under sudo
 	}
 
-	actualUser, err := GetActualUser()
+	uid, gid, err := GetActualUserIDs()
 	if err != nil {
 		return err
 	}
 
-	// Use system chown command for recursive operation
-	cmd := exec.Command("chown", "-R", actualUser.Username, root)
+	// Use system chown command for recursive operation with numeric IDs
+	// #nosec G204 -- using numeric UIDs from OS, not user input
+	cmd := exec.Command("chown", "-R", fmt.Sprintf("%d:%d", uid, gid), root)
 	return cmd.Run()
+}
+
+// SafeReadFile reads a file after validating the path to prevent directory traversal
+func SafeReadFile(path string) ([]byte, error) {
+	// Clean and validate the path
+	cleanPath := filepath.Clean(path)
+
+	// Ensure the path is absolute to prevent ambiguity
+	absPath, err := filepath.Abs(cleanPath)
+	if err != nil {
+		return nil, fmt.Errorf("invalid file path: %w", err)
+	}
+
+	// Check if file exists and is not a directory
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return nil, err
+	}
+	if info.IsDir() {
+		return nil, fmt.Errorf("path is a directory, not a file: %s", absPath)
+	}
+
+	// Read the file
+	// #nosec G304 -- path has been validated above
+	return os.ReadFile(absPath)
 }

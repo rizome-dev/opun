@@ -21,6 +21,7 @@ ARG VERSION=dev
 ARG COMMIT=none
 ARG BUILD_TIME
 RUN CGO_ENABLED=0 GOOS=linux go build \
+    -buildvcs=false \
     -ldflags "-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildTime=${BUILD_TIME} -s -w" \
     -o opun \
     ./cmd/opun

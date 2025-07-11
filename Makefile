@@ -48,18 +48,18 @@ help: ## Display this help message
 build: ## Build the binary
 	@echo "$(COLOR_BLUE)Building $(BINARY_NAME)...$(COLOR_RESET)"
 	@mkdir -p $(BUILD_DIR)
-	@CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PACKAGE)
+	@CGO_ENABLED=0 $(GOBUILD) -buildvcs=false $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PACKAGE)
 	@echo "$(COLOR_GREEN)✓ Binary built: $(BUILD_DIR)/$(BINARY_NAME)$(COLOR_RESET)"
 
 .PHONY: build-cross
 build-cross: ## Build binaries for multiple platforms
 	@echo "$(COLOR_BLUE)Building cross-platform binaries...$(COLOR_RESET)"
 	@mkdir -p $(BUILD_DIR)
-	@GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 $(MAIN_PACKAGE)
-	@GOOS=darwin GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 $(MAIN_PACKAGE)
-	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 $(MAIN_PACKAGE)
-	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 $(MAIN_PACKAGE)
-	@CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe $(MAIN_PACKAGE)
+	@GOOS=darwin GOARCH=amd64 $(GOBUILD) -buildvcs=false $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 $(MAIN_PACKAGE)
+	@GOOS=darwin GOARCH=arm64 $(GOBUILD) -buildvcs=false $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 $(MAIN_PACKAGE)
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -buildvcs=false $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 $(MAIN_PACKAGE)
+	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GOBUILD) -buildvcs=false $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 $(MAIN_PACKAGE)
+	@CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) -buildvcs=false $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe $(MAIN_PACKAGE)
 	@echo "$(COLOR_GREEN)✓ Cross-platform binaries built$(COLOR_RESET)"
 
 .PHONY: install
@@ -78,12 +78,12 @@ install: build ## Build and install the binary to /usr/local/bin
 
 .PHONY: dev
 dev: ## Quick development build (no optimization)
-	@CGO_ENABLED=0 $(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PACKAGE)
+	@CGO_ENABLED=0 $(GOBUILD) -buildvcs=false -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PACKAGE)
 	@echo "$(COLOR_GREEN)✓ Development build complete$(COLOR_RESET)"
 
 .PHONY: run
 run: ## Build and run the application
-	@CGO_ENABLED=0 $(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PACKAGE)
+	@CGO_ENABLED=0 $(GOBUILD) -buildvcs=false -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PACKAGE)
 	@./$(BUILD_DIR)/$(BINARY_NAME) $(ARGS)
 
 .PHONY: clean

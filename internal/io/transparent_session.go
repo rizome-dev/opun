@@ -71,6 +71,7 @@ type TransparentSessionConfig struct {
 
 // NewTransparentSession creates a new transparent PTY session
 func NewTransparentSession(config TransparentSessionConfig) (*TransparentSession, error) {
+	// #nosec G204 -- framework function that executes configured commands
 	cmd := exec.Command(config.Command, config.Args...)
 
 	if len(config.Env) > 0 {
@@ -214,8 +215,8 @@ func (s *TransparentSession) handleOutput() {
 		}
 
 		// Write to stdout
-		os.Stdout.Write(outputData)
-		os.Stdout.Write([]byte{'\n'})
+		_, _ = os.Stdout.Write(outputData)
+		_, _ = os.Stdout.Write([]byte{'\n'})
 	}
 
 	if err := scanner.Err(); err != nil && err != io.EOF {
@@ -270,12 +271,12 @@ func (s *TransparentSession) Close() error {
 	close(s.inputChan)
 
 	if s.ptmx != nil {
-		s.ptmx.Close()
+		_ = s.ptmx.Close() // Ignore close error
 	}
 
 	// Terminate the process if still running
 	if s.cmd.Process != nil {
-		s.cmd.Process.Signal(syscall.SIGTERM)
+		_ = s.cmd.Process.Signal(syscall.SIGTERM) // Ignore signal error
 		// Give it a moment to exit cleanly
 		done := make(chan error, 1)
 		go func() {
@@ -287,7 +288,7 @@ func (s *TransparentSession) Close() error {
 			// Process exited
 		case <-context.Background().Done():
 			// Force kill if needed
-			s.cmd.Process.Kill()
+			_ = s.cmd.Process.Kill() // Ignore kill error
 		}
 	}
 

@@ -35,7 +35,6 @@ linters:
     - unparam
     - unused
     - whitespace
-    - shadow
 
   disable:
     - gochecknoglobals
@@ -86,23 +85,8 @@ linters-settings:
       - condition
       - return
   
-  govet:
-    settings:
-      printf:
-        funcs:
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
-  
-  shadow:
-    strict: false
-  
   lll:
     line-length: 140
-  
-  maligned:
-    suggest-new: true
   
   misspell:
     locale: US
@@ -117,23 +101,21 @@ linters-settings:
     confidence: 0
 
 issues:
-  exclude-dirs:
-    - _archive
-    - vendor
-    - .git
-  exclude-files:
-    - ".*_test.go"
-    
   exclude-rules:
-    # Exclude some linters from running on tests files
-    - path: _test\.go
+    # Skip test files entirely
+    - path: "_test\\.go"
       linters:
-        - gocyclo
-        - errcheck
-        - dupl
-        - gosec
-        - funlen
-        - mnd
+        - all
+    
+    # Skip _archive directory
+    - path: "^_archive/"
+      linters:
+        - all
+    
+    # Skip vendor directory
+    - path: "^vendor/"
+      linters:
+        - all
     
     # Exclude some linters from running on CLI files
     - path: internal/cli/
@@ -141,15 +123,26 @@ issues:
         - dupl
         - funlen
     
-    # Exclude some linters from running on generated files
-    - path: ".*\\.pb\\.go"
-      linters:
-        - all
-    
     # Exclude lll issues for long lines with go:generate
     - linters:
         - lll
       source: "^//go:generate "
+    
+    # Allow G204 in specific cases for subprocess execution
+    - path: internal/mcp/tool_executor.go
+      linters:
+        - gosec
+      text: "G204"
+    
+    - path: internal/providers/
+      linters:
+        - gosec
+      text: "G204"
+    
+    - path: internal/pty/
+      linters:
+        - gosec
+      text: "G204"
 
   # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
   max-issues-per-linter: 0

@@ -125,6 +125,7 @@ func runChat(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create command with prepared environment
+	// #nosec G204 -- command is hardcoded based on provider type
 	c := exec.Command(command)
 	c.Dir = env.WorkingDir
 

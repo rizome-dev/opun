@@ -113,6 +113,7 @@ func (m *Manager) Execute(ctx context.Context, name string, variables map[string
 
 // loadWorkflow loads a workflow from a file
 func (m *Manager) loadWorkflow(path string) (*workflow.Workflow, error) {
+	// #nosec G304 -- workflow files are user-specified and trusted
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err

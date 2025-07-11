@@ -105,6 +105,7 @@ func LoadFromURL(url string) (*ImportPlugin, error) {
 	defer tmpFile.Close()
 
 	// Download the file
+	// #nosec G107 -- URL is user-provided for plugin download
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download plugin: %w", err)

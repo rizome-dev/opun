@@ -112,6 +112,7 @@ func (m *SharedConfigManager) CheckMCPServerInstalled(serverName string) (bool, 
 			}
 
 			// Check npm global install
+			// #nosec G204 -- server.Package comes from configuration
 			cmd := exec.Command("npm", "list", "-g", server.Package, "--json")
 			output, err := cmd.Output()
 			if err == nil {
@@ -132,6 +133,7 @@ func (m *SharedConfigManager) CheckMCPServerInstalled(serverName string) (bool, 
 	// Direct npm check
 	for _, server := range m.config.MCPServers {
 		if server.Name == serverName {
+			// #nosec G204 -- server.Package comes from configuration
 			cmd := exec.Command("npm", "list", "-g", server.Package, "--json")
 			output, err := cmd.Output()
 			if err == nil {
@@ -141,7 +143,7 @@ func (m *SharedConfigManager) CheckMCPServerInstalled(serverName string) (bool, 
 						if pkg, ok := deps[server.Package].(map[string]interface{}); ok {
 							if version, ok := pkg["version"].(string); ok {
 								// Update our tracking
-								m.UpdateMCPServerStatus(serverName, true, version)
+								_ = m.UpdateMCPServerStatus(serverName, true, version)
 								return true, version, nil
 							}
 						}
