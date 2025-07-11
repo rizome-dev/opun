@@ -225,13 +225,16 @@ func TestSharedConfigManager_SyncToProvider(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that Claude config was created (could be in either location)
-	claudeConfig1 := filepath.Join(tempDir, "Library", "Application Support", "Claude", "claude_desktop_config.json")
-	claudeConfig2 := filepath.Join(tempDir, ".config", "claude", "claude_desktop_config.json")
-
 	// At least one should exist
-	config1Exists := utils.FileExists(claudeConfig1)
-	config2Exists := utils.FileExists(claudeConfig2)
-	assert.True(t, config1Exists || config2Exists, "Claude config should exist in one of the expected locations")
+	claudePaths := getClaudeConfigPaths(tempDir)
+	claudeConfigExists := false
+	for _, p := range claudePaths {
+		if utils.FileExists(p) {
+			claudeConfigExists = true
+			break
+		}
+	}
+	assert.True(t, claudeConfigExists, "Claude config should exist in one of the expected locations")
 
 	// Test syncing to Gemini
 	err = manager.SyncToProvider("gemini")
@@ -244,6 +247,14 @@ func TestSharedConfigManager_SyncToProvider(t *testing.T) {
 	// Test unsupported provider
 	err = manager.SyncToProvider("unsupported")
 	assert.Error(t, err)
+}
+
+func getClaudeConfigPaths(homeDir string) []string {
+	return []string{
+		filepath.Join(homeDir, "Library", "Application Support", "Claude", "claude_desktop_config.json"), // macOS
+		filepath.Join(homeDir, ".config", "claude", "claude_desktop_config.json"),                      // Linux
+		filepath.Join(homeDir, "AppData", "Roaming", "Claude", "claude_desktop_config.json"),             // Windows
+	}
 }
 
 func TestSharedConfigManager_CheckMCPServerInstalled(t *testing.T) {
