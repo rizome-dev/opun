@@ -1,0 +1,55 @@
+{
+  "content": "# Planning Phase\n\n## Overview\n{{description}}\n\n## Current State\n{{current_state}}\n\n## Target State\n{{target_state}}\n\n## Implementation Steps\n1. [Add your implementation steps here]\n\n## Success Criteria\n{{success_criteria}}\n\n## Risks and Mitigations\n[Identify potential risks and how to mitigate them]",
+  "metadata": {
+    "id": "prompt-1751572819274882000",
+    "name": "planning-template",
+    "description": "Built-in planning-template",
+    "type": "template",
+    "tags": [
+      "planning",
+      "template",
+      "refactor"
+    ],
+    "category": "templates",
+    "version": "1.0.0",
+    "author": "system",
+    "created_at": "2025-07-03T15:00:19.274883-05:00",
+    "updated_at": "2025-07-03T15:00:19.274883-05:00",
+    "variables": [
+      {
+        "name": "description",
+        "description": "Variable description",
+        "type": "string",
+        "required": false,
+        "default_value": null,
+        "validation": ""
+      },
+      {
+        "name": "current_state",
+        "description": "Variable current_state",
+        "type": "string",
+        "required": false,
+        "default_value": null,
+        "validation": ""
+      },
+      {
+        "name": "target_state",
+        "description": "Variable target_state",
+        "type": "string",
+        "required": false,
+        "default_value": null,
+        "validation": ""
+      },
+      {
+        "name": "success_criteria",
+        "description": "Variable success_criteria",
+        "type": "string",
+        "required": false,
+        "default_value": null,
+        "validation": ""
+      }
+    ],
+    "includes": null,
+    "extra": null
+  }
+}

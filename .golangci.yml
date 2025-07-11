@@ -1,11 +1,5 @@
 run:
   timeout: 5m
-  skip-dirs:
-    - _archive
-    - vendor
-    - .git
-  skip-files:
-    - ".*_test.go"
 
 linters:
   enable:
@@ -14,7 +8,7 @@ linters:
     - dogsled
     - dupl
     - errcheck
-    - exportloopref
+    - copyloopvar
     - funlen
     - gochecknoinits
     - goconst
@@ -22,7 +16,7 @@ linters:
     - gocyclo
     - gofmt
     - goimports
-    - gomnd
+    - mnd
     - goprintffuncname
     - gosec
     - gosimple
@@ -41,13 +35,13 @@ linters:
     - unparam
     - unused
     - whitespace
+    - shadow
 
   disable:
     - gochecknoglobals
     - godox
     - godot
-    - goerr113
-    - exhaustivestruct
+    - err113
     - wsl
     - nlreturn
     - testpackage
@@ -85,17 +79,14 @@ linters-settings:
   goimports:
     local-prefixes: github.com/rizome-dev/opun
   
-  gomnd:
-    settings:
-      mnd:
-        checks:
-          - argument
-          - case
-          - condition
-          - return
+  mnd:
+    checks:
+      - argument
+      - case
+      - condition
+      - return
   
   govet:
-    check-shadowing: true
     settings:
       printf:
         funcs:
@@ -103,6 +94,9 @@ linters-settings:
           - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
           - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
           - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
+  
+  shadow:
+    strict: false
   
   lll:
     line-length: 140
@@ -123,6 +117,13 @@ linters-settings:
     confidence: 0
 
 issues:
+  exclude-dirs:
+    - _archive
+    - vendor
+    - .git
+  exclude-files:
+    - ".*_test.go"
+    
   exclude-rules:
     # Exclude some linters from running on tests files
     - path: _test\.go
@@ -132,7 +133,7 @@ issues:
         - dupl
         - gosec
         - funlen
-        - gomnd
+        - mnd
     
     # Exclude some linters from running on CLI files
     - path: internal/cli/

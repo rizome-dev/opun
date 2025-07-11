@@ -1,0 +1,35 @@
+{
+  "prompt-1751572819274882000": {
+    "ID": "prompt-1751572819274882000",
+    "Name": "planning-template",
+    "Category": "templates",
+    "Tags": [
+      "planning",
+      "template",
+      "refactor"
+    ],
+    "FilePath": "test-prompts/prompt-1751572819274882000.json"
+  },
+  "prompt-1751572819275855000": {
+    "ID": "prompt-1751572819275855000",
+    "Name": "review-template",
+    "Category": "templates",
+    "Tags": [
+      "review",
+      "template",
+      "quality"
+    ],
+    "FilePath": "test-prompts/prompt-1751572819275855000.json"
+  },
+  "prompt-1751572819276025000": {
+    "ID": "prompt-1751572819276025000",
+    "Name": "questions-template",
+    "Category": "templates",
+    "Tags": [
+      "questions",
+      "template",
+      "discovery"
+    ],
+    "FilePath": "test-prompts/prompt-1751572819276025000.json"
+  }
+}

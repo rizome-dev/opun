@@ -1,0 +1,31 @@
+{
+  "content": "# Code Review\n\n## Changes Summary\n{{changes_summary}}\n\n## Review Checklist\n- [ ] Code follows project conventions\n- [ ] Tests are comprehensive and passing\n- [ ] Documentation is updated\n- [ ] No security vulnerabilities introduced\n- [ ] Performance impact is acceptable\n\n## Detailed Review\n\n### Architecture\n[Review architectural decisions]\n\n### Code Quality\n[Review code quality aspects]\n\n### Testing\n[Review test coverage and quality]\n\n## Recommendations\n[Provide specific recommendations for improvement]",
+  "metadata": {
+    "id": "prompt-1751572819275855000",
+    "name": "review-template",
+    "description": "Built-in review-template",
+    "type": "template",
+    "tags": [
+      "review",
+      "template",
+      "quality"
+    ],
+    "category": "templates",
+    "version": "1.0.0",
+    "author": "system",
+    "created_at": "2025-07-03T15:00:19.275855-05:00",
+    "updated_at": "2025-07-03T15:00:19.275855-05:00",
+    "variables": [
+      {
+        "name": "changes_summary",
+        "description": "Variable changes_summary",
+        "type": "string",
+        "required": false,
+        "default_value": null,
+        "validation": ""
+      }
+    ],
+    "includes": null,
+    "extra": null
+  }
+}

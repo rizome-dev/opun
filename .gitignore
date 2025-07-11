@@ -1,6 +1,8 @@
-# Exclude test workflow directories but not .github/workflows
+# Exclude test workflow directories but not source code or GitHub workflows
 workflow*/
 !.github/workflows/
+!internal/workflow/
+!pkg/workflow/
 .claude/
 
 # Binaries for programs and plugins

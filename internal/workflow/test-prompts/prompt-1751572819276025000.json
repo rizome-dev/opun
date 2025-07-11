@@ -1,0 +1,39 @@
+{
+  "content": "# Clarifying Questions\n\nBased on the provided {{document_type}}, I have the following questions:\n\n## Technical Questions\n{{#each technical_questions}}\n- {{this}}\n{{/each}}\n\n## Business/Requirements Questions\n{{#each business_questions}}\n- {{this}}\n{{/each}}\n\n## Implementation Questions\n{{#each implementation_questions}}\n- {{this}}\n{{/each}}\n\nPlease provide answers to help create a comprehensive implementation plan.",
+  "metadata": {
+    "id": "prompt-1751572819276025000",
+    "name": "questions-template",
+    "description": "Built-in questions-template",
+    "type": "template",
+    "tags": [
+      "questions",
+      "template",
+      "discovery"
+    ],
+    "category": "templates",
+    "version": "1.0.0",
+    "author": "system",
+    "created_at": "2025-07-03T15:00:19.276026-05:00",
+    "updated_at": "2025-07-03T15:00:19.276026-05:00",
+    "variables": [
+      {
+        "name": "document_type",
+        "description": "Variable document_type",
+        "type": "string",
+        "required": false,
+        "default_value": null,
+        "validation": ""
+      },
+      {
+        "name": "this",
+        "description": "Variable this",
+        "type": "string",
+        "required": false,
+        "default_value": null,
+        "validation": ""
+      }
+    ],
+    "includes": null,
+    "extra": null
+  }
+}
