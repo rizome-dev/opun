@@ -1,3 +1,5 @@
+//go:build !windows
+
 package workflow
 
 // Copyright (C) 2025 Rizome Labs, Inc.
