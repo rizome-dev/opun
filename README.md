@@ -21,13 +21,7 @@ brew tap rizome-dev/homebrew-brews
 brew install opun
 ```
 
-### Script Installation
-
-```bash
-curl -sSL https://raw.githubusercontent.com/rizome-dev/opun/main/install.sh | bash
-```
-
-### From Source
+### From Source (Windows)
 
 ```bash
 git clone https://github.com/rizome-dev/opun && cd opun && sudo make install
