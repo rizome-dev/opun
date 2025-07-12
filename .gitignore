@@ -83,6 +83,7 @@ refactor-sessions/
 .opun/
 *.opun.yaml
 !example.opun.yaml
+.mcp.json
 
 # Local configuration
 config.local.yaml
