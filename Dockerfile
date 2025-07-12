@@ -1,31 +1,3 @@
-# Build stage
-FROM golang:1.24-alpine AS builder
-
-# Install dependencies
-RUN apk add --no-cache git make
-
-# Set working directory
-WORKDIR /build
-
-# Copy go mod files
-COPY go.mod go.sum ./
-
-# Download dependencies
-RUN go mod download
-
-# Copy source code
-COPY . .
-
-# Build the binary
-ARG VERSION=dev
-ARG COMMIT=none
-ARG BUILD_TIME
-RUN CGO_ENABLED=0 GOOS=linux go build \
-    -buildvcs=false \
-    -ldflags "-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildTime=${BUILD_TIME} -s -w" \
-    -o opun \
-    ./cmd/opun
-
 # Final stage
 FROM alpine:latest
 
@@ -40,8 +12,8 @@ RUN addgroup -g 1000 -S opun && \
 RUN mkdir -p /home/opun/.opun && \
     chown -R opun:opun /home/opun
 
-# Copy binary from builder
-COPY --from=builder /build/opun /usr/local/bin/opun
+# Copy pre-built binary from goreleaser
+COPY opun /usr/local/bin/opun
 
 # Switch to non-root user
 USER opun
