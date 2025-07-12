@@ -93,7 +93,7 @@ func TestClaudeConfigTranslator_GetConfigPath(t *testing.T) {
 		"Library/Application Support/Claude/claude_desktop_config.json",
 		".config/claude/claude_desktop_config.json",
 	}
-	
+
 	validPath := false
 	for _, expectedPath := range validPaths {
 		if strings.Contains(path, expectedPath) {

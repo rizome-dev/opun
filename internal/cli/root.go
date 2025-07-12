@@ -102,11 +102,7 @@ Simply type opun help [path to command] for full details.`,
 	)
 
 	// Add Main commands (user-facing operations)
-	rootCmd.AddCommand(
-		ChatCmd(),
-		RunCmd(),
-		RefactorCmd(),
-	)
+	addMainCommands(rootCmd)
 
 	// Add Capability commands
 	rootCmd.AddCommand(
