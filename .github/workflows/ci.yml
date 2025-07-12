@@ -104,7 +104,11 @@ jobs:
     - name: Test binary
       run: |
         ./opun --help
-        ./opun completion bash > /dev/null
+        if [ "${{ runner.os }}" == "Windows" ]; then
+          ./opun completion bash > NUL
+        else
+          ./opun completion bash > /dev/null
+        fi
 
   e2e:
     name: E2E Tests
