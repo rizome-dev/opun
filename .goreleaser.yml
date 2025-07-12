@@ -148,7 +148,7 @@ dockers:
       - "ghcr.io/rizome-dev/{{ .ProjectName }}:{{ .Version }}-amd64"
       - "ghcr.io/rizome-dev/{{ .ProjectName }}:latest-amd64"
     use: buildx
-    dockerfile: Dockerfile
+    dockerfile: Dockerfile.goreleaser
     build_flag_templates:
       - "--platform=linux/amd64"
       - "--build-arg=VERSION={{.Version}}"
@@ -160,7 +160,7 @@ dockers:
       - "ghcr.io/rizome-dev/{{ .ProjectName }}:latest-arm64"
     use: buildx
     goarch: arm64
-    dockerfile: Dockerfile
+    dockerfile: Dockerfile.goreleaser
     build_flag_templates:
       - "--platform=linux/arm64"
       - "--build-arg=VERSION={{.Version}}"

@@ -1,23 +1,5 @@
-# Build stage
-FROM golang:1.24-alpine AS builder
-
-# Install build dependencies
-RUN apk --no-cache add git
-
-# Set working directory
-WORKDIR /build
-
-# Copy go mod files
-COPY go.mod go.sum ./
-
-# Download dependencies
-RUN go mod download
-
-# Copy source code
-COPY . .
-
-# Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o opun ./cmd/opun
+# Dockerfile for use with goreleaser
+# This expects a pre-built binary to be provided
 
 # Final stage
 FROM alpine:latest
@@ -33,8 +15,8 @@ RUN addgroup -g 1000 -S opun && \
 RUN mkdir -p /home/opun/.opun && \
     chown -R opun:opun /home/opun
 
-# Copy pre-built binary from builder stage
-COPY --from=builder /build/opun /usr/local/bin/opun
+# Copy pre-built binary from goreleaser
+COPY opun /usr/local/bin/opun
 
 # Switch to non-root user
 USER opun
