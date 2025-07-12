@@ -17,7 +17,7 @@ reach out: [hi (at) rizome.dev](mailto://hi@rizome.dev)
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew tap rizome-dev/brews
+brew tap rizome-dev/homebrew-brews
 brew install opun
 ```
 

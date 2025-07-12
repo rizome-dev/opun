@@ -94,7 +94,7 @@ release:
     
     ### Homebrew (macOS/Linux)
     ```bash
-    brew tap rizome-dev/brews
+    brew tap rizome-dev/homebrew-brews
     brew install opun
     ```
     
@@ -127,7 +127,7 @@ brews:
     license: MIT
     repository:
       owner: rizome-dev
-      name: brews
+      name: homebrew-brews
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     commit_author:
