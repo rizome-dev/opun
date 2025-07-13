@@ -49,20 +49,47 @@ opun {update,delete}
 
 ## Configuration
 
-Opun uses a modular configuration system with different config files for various components. All configuration files are stored in `~/.opun/`.
+Opun's configuration system is designed to be modular, declarative, and human-readable. Each type of configuration serves a specific purpose in the ecosystem, allowing you to build complex automation workflows while maintaining simplicity and reusability.
+
+### Configuration Overview
+
+All configuration files are stored in `~/.opun/` and organized by type:
+
+```
+~/.opun/
+├── config.yaml            # Main configuration
+├── workflows/            # Multi-agent workflow definitions
+├── promptgarden/         # Reusable prompt templates
+├── actions/              # Simple command shortcuts
+├── tools/                # Provider-specific tools
+├── mcp/                  # MCP server configurations
+│   ├── servers/         # MCP server definitions
+│   └── tools/           # MCP tool definitions
+└── plugins/              # Installed plugins
+```
 
 ### Workflows (`~/.opun/workflows/*.yaml`)
 
-Workflows orchestrate multiple AI agents in sequence:
+**Purpose**: Workflows are the heart of Opun's multi-agent orchestration. They allow you to chain multiple AI agents together, passing context between them to accomplish complex tasks that would be difficult for a single agent.
+
+**Key Concepts**:
+- **Sequential Execution**: Agents run one after another, with each agent able to access outputs from previous agents
+- **Dependency Management**: Agents can depend on the success of previous agents using `depends_on`
+- **Conditional Execution**: Use JavaScript-like expressions in `condition` to control when agents run
+- **Context Passing**: Agents automatically save their outputs to files that subsequent agents can read using the `@` syntax
+- **Variable Substitution**: Use `{{variable}}` syntax to inject workflow variables, agent outputs, or file contents
+
+**Structure**:
 
 ```yaml
-name: code-review-workflow
-command: review         # Slash command to trigger this workflow
+# Workflow Metadata
+name: code-review-workflow          # Unique identifier for the workflow
+command: review                     # Slash command to trigger: /review file.go
 description: Comprehensive code review with multiple perspectives
-version: 1.0.0
-author: "Your Name"
+version: 1.0.0                      # Semantic versioning for tracking changes
+author: "Your Name"                 # Optional: workflow author
 
-# Workflow variables
+# Workflow Variables - Define inputs that users can provide
 variables:
   - name: file_path
     description: "Path to the file to review"
@@ -80,28 +107,36 @@ variables:
     type: string
     required: false
     default: "medium"
-    enum: ["low", "medium", "high", "critical"]
+    enum: ["low", "medium", "high", "critical"]  # Restrict to specific values
 
-# Global workflow settings
+# Global Workflow Settings - Apply to all agents unless overridden
 settings:
   output_dir: "./review-outputs/{{timestamp}}"
   log_level: "info"
   stop_on_error: false
-  timeout: 300          # Global timeout in seconds
+  timeout: 300          # Global timeout in seconds for entire workflow
 
-# Agent definitions
+# Agent Definitions - The core of your workflow
 agents:
   # First agent: Initial code analysis
-  - id: analyzer
-    name: "Code Analyzer"
-    provider: claude
-    model: sonnet
+  - id: analyzer                    # Unique ID for referencing this agent
+    name: "Code Analyzer"           # Human-readable name displayed during execution
+    provider: claude                # AI provider: claude or gemini
+    model: sonnet                   # Model variant (provider-specific)
+    
+    # The prompt is the instruction sent to the AI agent
+    # Supports variable substitution and file references
     prompt: |
       Analyze the code in {{file_path}} and create a structured report covering:
       1. Code structure and organization
       2. Potential issues and code smells
       3. Complexity metrics
       Focus areas: {{focus_areas}}
+      
+      IMPORTANT: Save your complete analysis to the output file.
+      
+    # Output file where the agent should save results (relative to output_dir)
+    # This file can be referenced by subsequent agents using {{analyzer.output}}
     output: analysis-report.md
     settings:
       timeout: 60
@@ -109,22 +144,33 @@ agents:
       temperature: 0.2
       quality_mode: deep-think
       
-  # Second agent: Security review (depends on analyzer)
+  # Second agent: Security review (demonstrates context passing)
   - id: security-reviewer
     name: "Security Auditor"
     provider: gemini
     model: pro
-    depends_on: ["analyzer"]
+    
+    # Dependencies control execution order
+    depends_on: ["analyzer"]        # Only run after analyzer completes
+    
+    # Conditional execution using JavaScript-like expressions
+    # Access agent success status and workflow variables
     condition: "analyzer.success && '{{focus_areas}}'.includes('security')"
+    
     prompt: |
-      Based on the initial analysis:
-      {{file:./review-outputs/{{timestamp}}/analysis-report.md}}
+      # Reading output from previous agent
+      # The {{analyzer.output}} reference is automatically converted to @filepath
+      Based on the initial analysis from the previous agent:
+      {{analyzer.output}}
       
       Perform a security audit of {{file_path}}:
       - Identify vulnerabilities (OWASP Top 10)
       - Check for hardcoded secrets
       - Review authentication/authorization
       - Assess input validation
+      
+      Save your findings to the output file.
+      
     output: security-audit.md
     settings:
       timeout: 90
@@ -158,16 +204,25 @@ agents:
     name: "Review Consolidator"
     provider: claude
     model: opus
+    
+    # Can depend on multiple agents - runs after all complete
     depends_on: ["security-reviewer", "performance-reviewer"]
+    
+    # Accessing outputs from multiple previous agents
+    # Each reference is converted to @/path/to/output/file.md
     prompt: |
-      Consolidate all reviews into a final report:
+      Consolidate all reviews into a final report.
       
-      Initial Analysis: {{analyzer.output}}
-      Security Review: {{security-reviewer.output}}
-      Performance Review: {{performance-reviewer.output}}
+      Read and synthesize the following analyses:
+      - Initial Analysis: {{analyzer.output}}
+      - Security Review: {{security-reviewer.output}}
+      - Performance Review: {{performance-reviewer.output}}
       
       Create a prioritized action list with severity levels.
       Only include items with severity >= {{severity_threshold}}.
+      
+      Save the consolidated report to the output file.
+      
     output: final-review.md
     settings:
       quality_mode: deep-think
@@ -189,9 +244,47 @@ metadata:
     - "Appropriate read permissions"
 ```
 
+**How Context Passing Works**:
+
+1. **Output Files**: Each agent saves its results to a file specified in the `output` field
+2. **Automatic References**: Use `{{agent-id.output}}` in prompts to reference previous outputs
+3. **File Translation**: References are automatically converted to `@filepath` syntax that AI providers understand
+4. **Timestamped Directories**: All outputs are saved in timestamped directories to prevent conflicts
+
+**Running Workflows**:
+
+```bash
+# Using the slash command
+opun chat
+> /review path/to/file.go
+
+# Direct execution with variables
+opun run review --file_path=main.go --focus_areas=security,performance
+
+# Interactive mode with variable prompts
+opun run review
+# You'll be prompted for any required variables
+```
+
+**Best Practices**:
+
+- **Modular Design**: Keep each agent focused on a specific task
+- **Clear Dependencies**: Use `depends_on` to ensure proper execution order
+- **Conditional Logic**: Use `condition` to skip unnecessary agents
+- **Error Handling**: Set `continue_on_error: true` for non-critical agents
+- **Output Instructions**: Always remind agents to save their output to files
+
 ### Remote Manifests
 
-Opun supports installing collections of prompts, workflows, actions, and tools from remote URLs:
+**Purpose**: Remote manifests allow you to share and distribute collections of Opun configurations. Think of them as "packages" that bundle related prompts, workflows, actions, and tools together.
+
+**Use Cases**:
+- Share team-specific workflows and standards
+- Distribute domain-specific toolkits (e.g., security auditing, performance testing)
+- Create reusable configuration libraries
+- Maintain consistency across projects
+
+**Structure**:
 
 ```yaml
 # Example manifest file (hosted at https://example.com/my-toolkit.yaml)
@@ -248,19 +341,36 @@ imports:
         find . -name "*.py" -exec black {} \;
 ```
 
-To install from a manifest:
+**Installing from Manifests**:
 
 ```bash
-# Interactive mode
+# Interactive installation
 opun add
-# Choose: Remote → Any type → Enter URL
+# Select: Remote → Any type → Enter manifest URL
 
-# The manifest will be downloaded and all items installed
+# Direct installation
+opun add --url https://example.com/my-toolkit.yaml
+
+# The manifest will be downloaded and all items installed to appropriate directories
 ```
+
+**Creating Manifests**:
+
+1. Bundle related configurations together
+2. Host on any accessible URL (GitHub, GitLab, S3, etc.)
+3. Use semantic versioning for updates
+4. Include clear descriptions and documentation
 
 ### MCP Tools (`~/.opun/mcp/tools/*.yaml`)
 
-Tools extend the capabilities of AI agents through the MCP protocol:
+**Purpose**: MCP (Model Context Protocol) tools extend AI agents with specific capabilities like web search, database queries, or API interactions. These tools are available to agents during execution.
+
+**Key Concepts**:
+- **Schema-Driven**: Define input and output schemas for type safety
+- **Provider Integration**: Tools are exposed to AI providers through MCP servers
+- **Composability**: Tools can be combined in workflows for complex operations
+
+**Structure**:
 
 ```yaml
 name: web-search
@@ -294,9 +404,31 @@ output_schema:
             type: string
 ```
 
+**Usage in Workflows**:
+
+```yaml
+agents:
+  - id: researcher
+    provider: claude
+    settings:
+      mcp_servers: ["web-tools"]     # Enable MCP server with web-search tool
+      tools: ["web-search"]           # Specific tool to make available
+    prompt: |
+      Research the latest security vulnerabilities for Node.js.
+      Use web search to find recent CVEs and patches.
+```
+
 ### Tools (`~/.opun/tools/*.yaml`)
 
-Tools provide quick access to common commands:
+**Purpose**: Tools are provider-specific shortcuts that make common operations available to AI agents. Unlike MCP tools, these are simpler and can directly execute commands, reference workflows, or use prompt templates.
+
+**Types of Tools**:
+
+1. **Command Tools**: Execute shell commands directly
+2. **Workflow Tools**: Trigger existing workflows
+3. **Prompt Tools**: Use prompt templates with specific context
+
+**Structure Examples**:
 
 ```yaml
 # Search code tool
@@ -346,9 +478,27 @@ context:
   include_recent_changes: true
 ```
 
+**Using Tools**:
+
+```bash
+# Tools are automatically available to agents based on provider
+# Configure in workflow agent settings:
+settings:
+  tools: ["search-code", "analyze-security", "explain-error"]
+```
+
 ### Prompt Garden Templates (`~/.opun/promptgarden/*.md`)
 
-Prompt templates with metadata and variable substitution:
+**Purpose**: The Prompt Garden is your centralized repository of reusable prompt templates. It promotes consistency, best practices, and knowledge sharing across your team.
+
+**Key Features**:
+- **Metadata-Driven**: Each prompt includes metadata for organization and discovery
+- **Variable Substitution**: Use `{{variable}}` placeholders for dynamic content
+- **Conditional Logic**: Use `{{#if}}` blocks for conditional prompt sections
+- **Version Control**: Track prompt evolution with semantic versioning
+- **Categorization**: Organize prompts by category and tags
+
+**Structure**:
 
 ```markdown
 ---
@@ -397,18 +547,98 @@ Please explain the following code for a {{audience_level}} developer:
 - Keep explanations concise but thorough
 ```
 
-### Environment Variables
-
-Opun supports environment variable substitution in configurations:
+**Using Prompt Garden Templates**:
 
 ```bash
-# Set environment variables for MCP servers
+# List available prompts
+opun list prompts
+
+# Use in chat with variables
+opun prompt code-explanation --code_snippet="function fibonacci(n) { ... }"
+
+# Reference in workflows
+agents:
+  - id: explainer
+    prompt: "@code-explanation"    # Reference by prompt name
+    variables:
+      code_snippet: "{{file_content}}"
+      audience_level: "beginner"
+```
+
+**Best Practices**:
+- **Consistent Structure**: Use similar formats across related prompts
+- **Clear Variables**: Document all variables with descriptions and defaults
+- **Version Control**: Update version numbers when making significant changes
+- **Effective Categorization**: Use categories and tags for easy discovery
+
+### Environment Variables
+
+**Purpose**: Environment variables provide a secure way to manage sensitive data and environment-specific configurations without hardcoding them in your configuration files.
+
+**Use Cases**:
+- API keys and tokens for MCP servers
+- Project-specific paths and settings
+- Team notifications and integrations
+- Environment-specific configurations (dev/staging/prod)
+
+**Setting Variables**:
+
+```bash
+# For MCP servers (common examples)
 export OPENROUTER_API_KEY="your-api-key"
 export UPSTASH_REDIS_REST_URL="your-redis-url"
 export UPSTASH_REDIS_REST_TOKEN="your-redis-token"
+export POSTGRES_CONNECTION_STRING="postgresql://..."
 
 # Custom variables for workflows
 export PROJECT_ROOT="/path/to/project"
 export REVIEW_TEAM_SLACK="@code-review-team"
+export CODE_STANDARDS_URL="https://company.com/standards"
+export MAX_FILE_SIZE="1000000"
+
+# Provider-specific settings
+export CLAUDE_MODEL="sonnet"
+export GEMINI_TEMPERATURE="0.7"
 ```
+
+**Using in Configurations**:
+
+```yaml
+# In workflows
+agents:
+  - id: analyzer
+    prompt: |
+      Analyze code in {{env.PROJECT_ROOT}}
+      Follow standards at {{env.CODE_STANDARDS_URL}}
+      
+# In MCP server configs
+mcp_servers:
+  - name: database
+    env:
+      CONNECTION_STRING: "${POSTGRES_CONNECTION_STRING}"
+      
+# In tool definitions
+tools:
+  - id: notify-team
+    command: "slack-cli send --channel {{env.REVIEW_TEAM_SLACK}}"
+```
+
+**Best Practices**:
+- **Security**: Never commit sensitive environment variables to version control
+- **Documentation**: Maintain a `.env.example` file with dummy values
+- **Validation**: Check for required variables at workflow start
+- **Defaults**: Provide sensible defaults where appropriate
+- **Naming**: Use UPPERCASE_WITH_UNDERSCORES for consistency
+
+### Configuration Summary
+
+Opun's configuration system is designed to scale from simple single-agent tasks to complex multi-agent workflows:
+
+1. **Start Simple**: Begin with basic prompts in the Prompt Garden
+2. **Build Workflows**: Combine prompts into multi-agent workflows
+3. **Add Tools**: Extend capabilities with MCP and provider-specific tools
+4. **Share Knowledge**: Create manifests to distribute your configurations
+5. **Iterate and Improve**: Use version control and metadata to evolve your toolkit
+
+The modular design ensures that each component can be developed, tested, and shared independently while working together seamlessly in production workflows.
 

@@ -40,6 +40,7 @@ type Variable struct {
 	Type         string      `yaml:"type" json:"type"` // string, number, boolean, file
 	Required     bool        `yaml:"required" json:"required"`
 	DefaultValue interface{} `yaml:"default" json:"default"`
+	Internal     bool        `yaml:"internal" json:"internal"` // If true, don't prompt user for this variable
 }
 
 // Agent represents a single agent in the workflow
