@@ -29,6 +29,7 @@ COLOR_BOLD := \033[1m
 COLOR_GREEN := \033[32m
 COLOR_YELLOW := \033[33m
 COLOR_BLUE := \033[34m
+COLOR_RED := \033[31m
 
 # Default target
 .DEFAULT_GOAL := help
@@ -147,10 +148,36 @@ vet: ## Run go vet
 lint: ## Run golangci-lint
 	@echo "$(COLOR_BLUE)Running linters...$(COLOR_RESET)"
 	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run ./...; \
-		echo "$(COLOR_GREEN)✓ Linting passed$(COLOR_RESET)"; \
+		if golangci-lint run ./...; then \
+			echo "$(COLOR_GREEN)✓ Linting passed$(COLOR_RESET)"; \
+		else \
+			echo "$(COLOR_RED)✗ Linting failed$(COLOR_RESET)"; \
+			exit 1; \
+		fi \
+	elif [ -x "$(HOME)/go/bin/golangci-lint" ]; then \
+		if $(HOME)/go/bin/golangci-lint run ./...; then \
+			echo "$(COLOR_GREEN)✓ Linting passed$(COLOR_RESET)"; \
+		else \
+			echo "$(COLOR_RED)✗ Linting failed$(COLOR_RESET)"; \
+			exit 1; \
+		fi \
 	else \
 		echo "$(COLOR_YELLOW)⚠ golangci-lint not installed. Run 'make setup' to install.$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)  Hint: If you've run 'make setup', ensure $(HOME)/go/bin is in your PATH$(COLOR_RESET)"; \
+	fi
+
+.PHONY: lint-fix
+lint-fix: ## Run golangci-lint with auto-fix
+	@echo "$(COLOR_BLUE)Running linters with auto-fix...$(COLOR_RESET)"
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run --fix ./... && \
+		echo "$(COLOR_GREEN)✓ Auto-fix applied$(COLOR_RESET)"; \
+	elif [ -x "$(HOME)/go/bin/golangci-lint" ]; then \
+		$(HOME)/go/bin/golangci-lint run --fix ./... && \
+		echo "$(COLOR_GREEN)✓ Auto-fix applied$(COLOR_RESET)"; \
+	else \
+		echo "$(COLOR_YELLOW)⚠ golangci-lint not installed. Run 'make setup' to install.$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)  Hint: If you've run 'make setup', ensure $(HOME)/go/bin is in your PATH$(COLOR_RESET)"; \
 	fi
 
 .PHONY: check
@@ -179,10 +206,37 @@ vendor: ## Create vendor directory
 .PHONY: setup
 setup: ## Install development tools
 	@echo "$(COLOR_BLUE)Installing development tools...$(COLOR_RESET)"
-	@$(GOCMD) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@echo "$(COLOR_YELLOW)Note: Installing tools with current Go version $(shell go version | awk '{print $$3}')$(COLOR_RESET)"
+	@echo "$(COLOR_YELLOW)Building golangci-lint from source to match Go version...$(COLOR_RESET)"
+	@$(GOCMD) install -v github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	@$(GOCMD) install github.com/securego/gosec/v2/cmd/gosec@latest
 	@$(GOCMD) install github.com/goreleaser/goreleaser@latest
 	@echo "$(COLOR_GREEN)✓ Development tools installed$(COLOR_RESET)"
+	@if [ -x "$(HOME)/go/bin/golangci-lint" ]; then \
+		echo "$(COLOR_BLUE)golangci-lint version:$(COLOR_RESET) $$($(HOME)/go/bin/golangci-lint version 2>&1 | head -1)"; \
+	fi
+
+.PHONY: clean-tools
+clean-tools: ## Remove installed development tools
+	@echo "$(COLOR_YELLOW)Removing development tools...$(COLOR_RESET)"
+	@rm -f $(HOME)/go/bin/golangci-lint
+	@rm -f $(HOME)/go/bin/gosec
+	@rm -f $(HOME)/go/bin/goreleaser
+	@echo "$(COLOR_GREEN)✓ Development tools removed$(COLOR_RESET)"
+
+.PHONY: clean-setup
+clean-setup: clean-tools ## Clean and reinstall development tools
+	@echo "$(COLOR_BLUE)Cleaning Go module cache...$(COLOR_RESET)"
+	@$(GOCMD) clean -modcache
+	@echo "$(COLOR_GREEN)✓ Module cache cleaned$(COLOR_RESET)"
+	@$(MAKE) setup
+
+.PHONY: deep-clean
+deep-clean: clean clean-tools ## Deep clean including Go cache and installed tools
+	@echo "$(COLOR_BLUE)Performing deep clean...$(COLOR_RESET)"
+	@$(GOCMD) clean -cache
+	@$(GOCMD) clean -testcache
+	@echo "$(COLOR_GREEN)✓ Go build and test caches cleaned$(COLOR_RESET)"
 
 .PHONY: generate
 generate: ## Run go generate
@@ -209,6 +263,23 @@ release-dry-run: ## Perform a dry run of goreleaser
 release: ## Create a new release (requires tag)
 	@echo "$(COLOR_BLUE)Creating release...$(COLOR_RESET)"
 	@goreleaser release --rm-dist
+
+.PHONY: tag-prerelease
+tag-prerelease: ## Create a prerelease tag (usage: make tag-prerelease VERSION=1.0.0-rc1)
+	@if [ -z "$(VERSION)" ]; then \
+		echo "$(COLOR_RED)Error: VERSION is required$(COLOR_RESET)"; \
+		echo "Usage: make tag-prerelease VERSION=1.0.0-rc1"; \
+		exit 1; \
+	fi
+	@if [[ ! "$(VERSION)" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[a-zA-Z0-9]+.*$$ ]]; then \
+		echo "$(COLOR_RED)Error: Invalid prerelease version format$(COLOR_RESET)"; \
+		echo "Expected format: X.Y.Z-identifier (e.g., 1.0.0-rc1, 2.1.0-beta)"; \
+		exit 1; \
+	fi
+	@echo "$(COLOR_BLUE)Creating prerelease tag v$(VERSION)...$(COLOR_RESET)"
+	@git tag -a "v$(VERSION)" -m "Prerelease v$(VERSION)"
+	@echo "$(COLOR_GREEN)✓ Tag created: v$(VERSION)$(COLOR_RESET)"
+	@echo "$(COLOR_YELLOW)Push with: git push origin v$(VERSION)$(COLOR_RESET)"
 
 # Opun-specific targets
 .PHONY: refactor-sessions-clean

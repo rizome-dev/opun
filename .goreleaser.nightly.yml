@@ -26,6 +26,7 @@ builds:
       - -X main.version={{.Version}}
       - -X main.commit={{.Commit}}
       - -X main.buildTime={{.Date}}
+      - -X main.prerelease=true
 
 archives:
   - id: opun
@@ -35,6 +36,7 @@ archives:
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
+      {{- if .IsSnapshot }}-SNAPSHOT{{ end }}
     format_overrides:
       - goos: windows
         format: zip
@@ -82,20 +84,22 @@ release:
     owner: rizome-dev
     name: opun
   draft: false
-  prerelease: auto
+  prerelease: true  # Always mark as prerelease for nightly
   mode: replace
   header: |
-    ## Opun {{ .Tag }}
+    ## Opun {{ .Tag }} (Nightly/Prerelease)
+    
+    ⚠️ **This is a prerelease version and may contain bugs or incomplete features.**
     
     AI code agent automation framework for managing Claude Code and Gemini CLI sessions.
     
   footer: |
     ## Installation
     
-    ### Homebrew (macOS/Linux)
+    ### Homebrew (macOS/Linux) - Nightly
     ```bash
     brew tap rizome-dev/homebrew-brews
-    brew install opun
+    brew install opun-nightly
     ```
     
     ### Script (macOS/Linux)
@@ -121,9 +125,9 @@ release:
     **Full Documentation**: https://github.com/rizome-dev/opun
 
 brews:
-  - name: opun
+  - name: opun-nightly
     homepage: https://github.com/rizome-dev/opun
-    description: AI code agent automation framework
+    description: AI code agent automation framework (Nightly/Prerelease)
     license: MIT
     repository:
       owner: rizome-dev
@@ -133,10 +137,10 @@ brews:
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
-    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    commit_msg_template: "Brew formula update for {{ .ProjectName }}-nightly version {{ .Tag }}"
     folder: Formula
-    # Skip homebrew update for prereleases
-    skip_upload: auto
+    conflicts_with:
+      - opun
     test: |
       system "#{bin}/opun", "--version"
     install: |
@@ -144,11 +148,16 @@ brews:
       
       # Generate and install shell completions
       generate_completions_from_executable(bin/"opun", "completion")
+    caveats: |
+      ⚠️  This is a prerelease version of opun.
+      
+      For the stable version, use:
+        brew install opun
 
 dockers:
   - image_templates:
       - "ghcr.io/rizome-dev/{{ .ProjectName }}:{{ .Version }}-amd64"
-      - "ghcr.io/rizome-dev/{{ .ProjectName }}:latest-amd64"
+      - "ghcr.io/rizome-dev/{{ .ProjectName }}:nightly-amd64"
     use: buildx
     dockerfile: Dockerfile.goreleaser
     build_flag_templates:
@@ -159,7 +168,7 @@ dockers:
   
   - image_templates:
       - "ghcr.io/rizome-dev/{{ .ProjectName }}:{{ .Version }}-arm64"
-      - "ghcr.io/rizome-dev/{{ .ProjectName }}:latest-arm64"
+      - "ghcr.io/rizome-dev/{{ .ProjectName }}:nightly-arm64"
     use: buildx
     goarch: arm64
     dockerfile: Dockerfile.goreleaser
@@ -175,7 +184,7 @@ docker_manifests:
       - "ghcr.io/rizome-dev/{{ .ProjectName }}:{{ .Version }}-amd64"
       - "ghcr.io/rizome-dev/{{ .ProjectName }}:{{ .Version }}-arm64"
   
-  - name_template: "ghcr.io/rizome-dev/{{ .ProjectName }}:latest"
+  - name_template: "ghcr.io/rizome-dev/{{ .ProjectName }}:nightly"
     image_templates:
-      - "ghcr.io/rizome-dev/{{ .ProjectName }}:latest-amd64"
-      - "ghcr.io/rizome-dev/{{ .ProjectName }}:latest-arm64"
+      - "ghcr.io/rizome-dev/{{ .ProjectName }}:nightly-amd64"
+      - "ghcr.io/rizome-dev/{{ .ProjectName }}:nightly-arm64"

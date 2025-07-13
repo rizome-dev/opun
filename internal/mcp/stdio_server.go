@@ -292,9 +292,7 @@ func (s *StdioMCPServer) handleToolsList(id interface{}) {
 	if s.toolRegistry != nil {
 		translator := toolslib.NewTranslator(s.toolRegistry)
 		standardActions := translator.GetMCPActions("") // Get all actions
-		for _, action := range standardActions {
-			tools = append(tools, action)
-		}
+		tools = append(tools, standardActions...)
 	}
 
 	// Add MCP tools from ~/.opun/tools

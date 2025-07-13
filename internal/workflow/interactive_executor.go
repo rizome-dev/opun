@@ -58,6 +58,9 @@ type InteractiveExecutor struct {
 	
 	// Workflow output directory with timestamp
 	outputDir string
+	
+	// Cancel function for the entire workflow
+	cancelFunc context.CancelFunc
 }
 
 // NewInteractiveExecutor creates a new interactive workflow executor
@@ -75,6 +78,9 @@ func (e *InteractiveExecutor) Execute(ctx context.Context, wf *workflow.Workflow
 	// Create a context that can be canceled on interrupt
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	
+	// Store cancel function for use in PTY sessions
+	e.cancelFunc = cancel
 
 	// Handle interrupt signals
 	sigChan := make(chan os.Signal, 1)
@@ -284,7 +290,11 @@ func (e *InteractiveExecutor) executeInteractiveAgent(ctx context.Context, agent
 		if err != nil {
 			return e.handleAgentError(agent, agentState, fmt.Errorf("failed to set raw mode: %w", err))
 		}
-		defer term.Restore(int(os.Stdin.Fd()), oldState)
+		defer func() {
+			if oldState != nil {
+				term.Restore(int(os.Stdin.Fd()), oldState)
+			}
+		}()
 	}
 
 	// Schedule prompt injection after provider is ready
@@ -321,12 +331,45 @@ func (e *InteractiveExecutor) executeInteractiveAgent(ctx context.Context, agent
 		}
 	}()
 
-	// Copy stdin to PTY
+	// Copy stdin to PTY with interrupt detection
 	go func() {
-		_, err := io.Copy(ptmx, os.Stdin)
-		select {
-		case errChan <- err:
-		case <-doneChan:
+		buf := make([]byte, 1024)
+		for {
+			select {
+			case <-doneChan:
+				return
+			default:
+				n, err := os.Stdin.Read(buf)
+				if err != nil {
+					select {
+					case errChan <- err:
+					case <-doneChan:
+					}
+					return
+				}
+				
+				// Check for Ctrl+C (0x03) in raw mode
+				for i := 0; i < n; i++ {
+					if buf[i] == 0x03 { // Ctrl+C
+						// Restore terminal before canceling
+						if oldState != nil {
+							term.Restore(int(os.Stdin.Fd()), oldState)
+						}
+						fmt.Printf("\n\n⚠️  Interrupt received, stopping workflow...\n")
+						e.cancelFunc() // Cancel the entire workflow
+						return
+					}
+				}
+				
+				// Write to PTY
+				if _, err := ptmx.Write(buf[:n]); err != nil {
+					select {
+					case errChan <- err:
+					case <-doneChan:
+					}
+					return
+				}
+			}
 		}
 	}()
 
@@ -340,6 +383,11 @@ func (e *InteractiveExecutor) executeInteractiveAgent(ctx context.Context, agent
 	case <-ctx.Done():
 		// Context canceled, clean up
 		close(doneChan)
+		
+		// Restore terminal state immediately
+		if oldState != nil {
+			term.Restore(int(os.Stdin.Fd()), oldState)
+		}
 		
 		// Send interrupt to the PTY session
 		cmd.Process.Signal(os.Interrupt)

@@ -74,10 +74,11 @@ func (h *HealthCheck) CheckAllServices() []ServiceStatus {
 	services = append(services, h.checkMemoryManagement())
 
 	// Provider-specific services
-	if h.provider == "claude" {
+	switch h.provider {
+	case "claude":
 		services = append(services, h.checkPromptGardenClaude())
 		services = append(services, h.checkSlashCommandsClaude())
-	} else if h.provider == "gemini" {
+	case "gemini":
 		services = append(services, h.checkPromptGardenGemini())
 		services = append(services, h.checkSlashCommandsGemini())
 	}

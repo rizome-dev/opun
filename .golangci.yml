@@ -1,10 +1,13 @@
+# golangci-lint v2 requires version to be specified
+version: 2
+
 run:
   timeout: 5m
 
 linters:
   enable:
     - bodyclose
-    - depguard
+    # - depguard  # TODO: Fix v2 configuration - currently blocking all imports
     - dogsled
     - dupl
     - errcheck
@@ -14,27 +17,24 @@ linters:
     - goconst
     - gocritic
     - gocyclo
-    - gofmt
-    - goimports
     - mnd
     - goprintffuncname
     - gosec
-    - gosimple
     - govet
     - ineffassign
     - lll
-    - misspell
+    - misspell    # auto-fix: spelling errors
     - nakedret
     - noctx
-    - nolintlint
+    - nolintlint  # auto-fix: nolint directives
     - revive
     - staticcheck
-    - stylecheck
-    - typecheck
     - unconvert
     - unparam
     - unused
-    - whitespace
+    - whitespace  # auto-fix: unnecessary newlines
+    - godot       # auto-fix: comments should end with period
+    - usestdlibvars  # auto-fix: use stdlib constants
 
   disable:
     - gochecknoglobals
@@ -48,7 +48,16 @@ linters:
 linters-settings:
   depguard:
     rules:
-      main:
+      Main:
+        list-mode: lax
+        files:
+          - $all
+        allow:
+          - $gostd  # Go standard library
+          - github.com/rizome-dev/opun  # Allow all project imports
+          - github.com  # Allow all github imports except explicitly denied
+          - gopkg.in  # Allow gopkg.in imports (e.g., yaml.v3)
+          - golang.org  # Allow golang.org imports (e.g., x/term)
         deny:
           - pkg: "github.com/pkg/errors"
             desc: "Use standard library errors package with fmt.Errorf"
@@ -75,8 +84,6 @@ linters-settings:
   gocyclo:
     min-complexity: 15
   
-  goimports:
-    local-prefixes: github.com/rizome-dev/opun
   
   mnd:
     checks:

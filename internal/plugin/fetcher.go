@@ -208,7 +208,7 @@ func (f *PluginFetcher) getGitLabDownloadURL(parsed *url.URL) (string, string, e
 
 // downloadFile downloads a file from URL to destination
 func (f *PluginFetcher) downloadFile(ctx context.Context, url string, dest string) error {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
@@ -220,8 +220,8 @@ func (f *PluginFetcher) downloadFile(ctx context.Context, url string, dest strin
 	defer resp.Body.Close()
 
 	// Handle GitHub fallback for main->master
-	if resp.StatusCode == 404 && f.githubFallbackURL != "" {
-		req, err = http.NewRequestWithContext(ctx, "GET", f.githubFallbackURL, nil)
+	if resp.StatusCode == http.StatusNotFound && f.githubFallbackURL != "" {
+		req, err = http.NewRequestWithContext(ctx, http.MethodGet, f.githubFallbackURL, nil)
 		if err != nil {
 			return err
 		}
