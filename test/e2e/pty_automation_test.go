@@ -36,17 +36,24 @@ func TestPTYAutomation(t *testing.T) {
 	t.Run("PTY Session Creation", func(t *testing.T) {
 		config := pty.SessionConfig{
 			Provider: "test",
-			Command:  "echo",
-			Args:     []string{"hello world"},
+			Command:  "/bin/sh",
+			Args:     []string{"-c", "echo 'hello world'; sleep 0.5"},
 		}
 
 		session, err := pty.NewSession(config)
 		require.NoError(t, err)
 		defer session.Close()
 
-		// Wait for output
-		time.Sleep(100 * time.Millisecond)
-		output := session.GetOutput()
+		// Wait for output with retry logic
+		var output []byte
+		for i := 0; i < 10; i++ {
+			time.Sleep(100 * time.Millisecond)
+			output = session.GetOutput()
+			if len(output) > 0 && string(output) != "" {
+				break
+			}
+		}
+
 		assert.Contains(t, string(output), "hello world")
 	})
 

@@ -51,7 +51,7 @@ providers:
 		// In CI, Claude might be installed, which causes issues
 		// So we'll test with a non-existent provider instead
 		args := []string{"nonexistent-provider"}
-		
+
 		// Create config for the non-existent provider to avoid config errors
 		configPath := filepath.Join(opunDir, "config.yaml")
 		configContent := `default_provider: nonexistent-provider
@@ -60,32 +60,32 @@ providers:
     name: nonexistent-provider
 `
 		require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0644))
-		
+
 		// We expect an error because the provider won't exist
 		err := runChat(cmd, args)
 		assert.Error(t, err)
-		
+
 		// The error should be about unsupported provider
 		assert.Contains(t, err.Error(), "unsupported provider: nonexistent-provider")
 	})
-	
+
 	t.Run("Platform-specific command handling", func(t *testing.T) {
 		// Skip this test if Claude is actually running to avoid interference
 		if os.Getenv("CI") != "" {
 			t.Skip("Skipping in CI environment where Claude may be installed")
 		}
-		
+
 		// On Windows, the implementation should look for .exe and .cmd files
 		// On Unix, it should look for standard executables
 		// This is tested implicitly by the runChat function
-		
+
 		// Create a temporary directory for mock commands
 		tempDir := t.TempDir()
 		oldPath := os.Getenv("PATH")
 		pathSeparator := string(os.PathListSeparator)
 		os.Setenv("PATH", tempDir+pathSeparator+oldPath)
 		defer os.Setenv("PATH", oldPath)
-		
+
 		// Create a mock executable appropriate for the platform
 		var mockFile string
 		if runtime.GOOS == "windows" {
@@ -93,17 +93,17 @@ providers:
 		} else {
 			mockFile = filepath.Join(tempDir, "claude")
 		}
-		
+
 		// Write a simple script that exits immediately
 		content := []byte("#!/bin/sh\nexit 0\n")
 		if runtime.GOOS == "windows" {
 			content = []byte("@echo off\nexit /b 0\n")
 		}
 		require.NoError(t, os.WriteFile(mockFile, content, 0755))
-		
+
 		args := []string{"claude"}
 		err := runChat(cmd, args)
-		
+
 		// The result depends on whether the mock script works as a PTY
 		// If err is nil, that means our mock was found and executed
 		// If err is not nil, check it's not "command not found"
@@ -113,7 +113,7 @@ providers:
 		}
 		// If err is nil, that's also acceptable - it means the mock was executed
 	})
-	
+
 	t.Run("No platform-specific signals in interface", func(t *testing.T) {
 		// The chat implementation should not expose SIGWINCH or other
 		// Unix-specific signals in its public interface

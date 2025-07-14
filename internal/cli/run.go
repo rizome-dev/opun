@@ -109,26 +109,37 @@ func runWorkflow(name string, vars map[string]string) error {
 	// Ensure terminal is restored on interrupt
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
+	
+	// Track if we're handling a signal
+	signalHandled := make(chan struct{})
 	go func() {
 		<-sigChan
 		cancel()
-		// Give a moment for cleanup
-		time.Sleep(100 * time.Millisecond)
-		// Ensure terminal is restored
-		if term.IsTerminal(int(os.Stdin.Fd())) {
-			// Try to restore terminal state
-			_ = exec.Command("stty", "sane").Run()
-		}
-		os.Exit(1)
+		close(signalHandled)
+		// Don't exit immediately - let the workflow executor handle cleanup
 	}()
 
 	// Execute workflow
-	if err := executor.Execute(ctx, wf, variables); err != nil {
-		// Ensure terminal is restored
-		if term.IsTerminal(int(os.Stdin.Fd())) {
-			_ = exec.Command("stty", "sane").Run()
-		}
-		return fmt.Errorf("workflow execution failed: %w", err)
+	execErr := executor.Execute(ctx, wf, variables)
+	
+	// Always ensure terminal is restored, whether we succeeded or failed
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		_ = exec.Command("stty", "sane").Run()
+	}
+	
+	// Check if we were interrupted
+	select {
+	case <-signalHandled:
+		// Give a moment for the executor to finish cleanup
+		time.Sleep(200 * time.Millisecond)
+		return fmt.Errorf("interrupted")
+	default:
+		// Normal completion or error
+	}
+	
+	if execErr != nil {
+		return fmt.Errorf("workflow execution failed: %w", execErr)
 	}
 
 	// Completion message is printed by the executor

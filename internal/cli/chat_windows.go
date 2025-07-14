@@ -112,7 +112,7 @@ func runChat(cmd *cobra.Command, args []string) error {
 
 	// On Windows, we don't need to handle SIGWINCH for resizing
 	// The Windows Console API handles this automatically with ConPTY
-	
+
 	// Set initial size from current terminal
 	if err := pty.InheritSize(os.Stdin, ptmx); err != nil {
 		// Non-fatal error, continue without resize

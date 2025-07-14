@@ -45,7 +45,7 @@ func TestRunChat_Windows(t *testing.T) {
 		// This test assumes claude is not installed in the test environment
 		// If claude is installed, the test will try to run it and may fail differently
 		args := []string{"claude"}
-		
+
 		// Create a minimal config to avoid injection manager errors
 		configPath := filepath.Join(opunDir, "config.yaml")
 		configContent := `default_provider: claude
@@ -58,17 +58,17 @@ providers:
 		err := runChat(cmd, args)
 		if err != nil {
 			// The error could be either "command not found" or PTY-related
-			assert.True(t, 
+			assert.True(t,
 				contains(err.Error(), "claude command not found") ||
-				contains(err.Error(), "failed to start claude") ||
-				contains(err.Error(), "failed to prepare provider environment"),
+					contains(err.Error(), "failed to start claude") ||
+					contains(err.Error(), "failed to prepare provider environment"),
 				"Unexpected error: %v", err)
 		}
 	})
 
 	t.Run("Gemini provider not found", func(t *testing.T) {
 		args := []string{"gemini"}
-		
+
 		// Create a minimal config
 		configPath := filepath.Join(opunDir, "config.yaml")
 		configContent := `default_provider: gemini
@@ -82,8 +82,8 @@ providers:
 		if err != nil {
 			assert.True(t,
 				contains(err.Error(), "gemini command not found") ||
-				contains(err.Error(), "failed to start gemini") ||
-				contains(err.Error(), "failed to prepare provider environment"),
+					contains(err.Error(), "failed to start gemini") ||
+					contains(err.Error(), "failed to prepare provider environment"),
 				"Unexpected error: %v", err)
 		}
 	})
@@ -91,10 +91,10 @@ providers:
 	t.Run("Actions directory warning", func(t *testing.T) {
 		// Remove actions directory to trigger warning
 		os.RemoveAll(actionsDir)
-		
+
 		args := []string{"claude"}
 		err := runChat(cmd, args)
-		
+
 		// Should still get an error (provider not found or config issue)
 		// but the actions loading should have shown a warning
 		assert.Error(t, err)
@@ -106,29 +106,29 @@ func TestWindowsChatSpecificFeatures(t *testing.T) {
 	t.Run("Windows command resolution", func(t *testing.T) {
 		// Test that Windows-specific command resolution works
 		// This is implicitly tested in runChat by looking for .exe and .cmd variants
-		
+
 		// Create a temporary directory and add it to PATH
 		tempDir := t.TempDir()
 		oldPath := os.Getenv("PATH")
 		os.Setenv("PATH", tempDir+";"+oldPath)
 		defer os.Setenv("PATH", oldPath)
-		
+
 		// Create mock executables
 		mockClaude := filepath.Join(tempDir, "claude.exe")
 		require.NoError(t, os.WriteFile(mockClaude, []byte("mock"), 0755))
-		
+
 		// Now the command should be found
 		cmd := &cobra.Command{}
 		args := []string{"claude"}
-		
+
 		// Set up minimal environment
 		tempHome := t.TempDir()
 		os.Setenv("HOME", tempHome)
 		os.Setenv("USERPROFILE", tempHome)
-		
+
 		opunDir := filepath.Join(tempHome, ".opun")
 		require.NoError(t, os.MkdirAll(filepath.Join(opunDir, "actions"), 0755))
-		
+
 		configPath := filepath.Join(opunDir, "config.yaml")
 		configContent := `default_provider: claude
 providers:
@@ -136,7 +136,7 @@ providers:
     name: claude
 `
 		require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0644))
-		
+
 		// This will still fail because our mock exe isn't a real PTY provider
 		// but it should fail differently (PTY error instead of command not found)
 		err := runChat(cmd, args)
@@ -169,10 +169,10 @@ func TestChatCommandPathResolution(t *testing.T) {
 	tempHome := t.TempDir()
 	os.Setenv("HOME", tempHome)
 	os.Setenv("USERPROFILE", tempHome)
-	
+
 	opunDir := filepath.Join(tempHome, ".opun")
 	require.NoError(t, os.MkdirAll(filepath.Join(opunDir, "actions"), 0755))
-	
+
 	configPath := filepath.Join(opunDir, "config.yaml")
 	configContent := `default_provider: claude
 providers:

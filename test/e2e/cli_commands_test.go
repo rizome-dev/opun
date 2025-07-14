@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/fang"
 	"github.com/rizome-dev/opun/internal/cli"
@@ -191,9 +192,13 @@ agents:
 		cmd := cli.RootCmd()
 		cmd.SetArgs([]string{"run", "test-workflow"})
 
-		// This will fail because we don't have a mock provider, but it tests the command structure
-		err := fang.Execute(context.Background(), cmd)
-		assert.Error(t, err) // Expected to fail without mock provider
+		// Create a context with timeout since mock provider will run
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		// Execute the command - should succeed with mock provider
+		err := fang.Execute(ctx, cmd)
+		assert.NoError(t, err)
 	})
 }
 

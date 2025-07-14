@@ -57,15 +57,14 @@ func TestWorkflowExecution(t *testing.T) {
 			},
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		// Execute workflow (will fail without mock provider)
+		// Execute workflow with mock provider
 		err := executor.Execute(ctx, wf, map[string]interface{}{})
 
-		// We expect this to fail since we don't have a mock provider registered
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported provider: mock")
+		// Should succeed now that mock provider is supported
+		assert.NoError(t, err)
 	})
 
 	t.Run("Workflow with Prompt Garden", func(t *testing.T) {
@@ -109,15 +108,14 @@ func TestWorkflowExecution(t *testing.T) {
 			},
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		// Execute workflow
+		// Execute workflow with mock provider
 		err = executor.Execute(ctx, wf, map[string]interface{}{})
 
-		// We expect this to fail since we don't have a mock provider registered
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported provider: mock")
+		// Should succeed now that mock provider is supported
+		assert.NoError(t, err)
 	})
 }
 
