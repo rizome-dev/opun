@@ -19,6 +19,7 @@ package providers
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -38,15 +39,19 @@ func NewGeminiPTYProvider() *GeminiPTYProvider {
 
 // StartSession starts a new Gemini session
 func (p *GeminiPTYProvider) StartSession(ctx context.Context, workingDir string) error {
+	// Gemini needs to be started with 'chat' subcommand
 	config := pty.SessionConfig{
 		Provider:   "gemini",
 		Command:    "gemini",
-		Args:       []string{},
+		Args:       []string{"chat", "--model", "gemini-pro"},
 		WorkingDir: workingDir,
 		OnOutput: func(data []byte) {
-			// Could log output here if needed
+			// DEBUG: Log all output
+			fmt.Fprintf(os.Stderr, "[GEMINI DEBUG] Raw output: %q\n", string(data))
 		},
 	}
+	
+	fmt.Fprintf(os.Stderr, "[GEMINI DEBUG] Starting session with command: %s %v\n", config.Command, config.Args)
 
 	session, err := pty.NewSession(config)
 	if err != nil {
@@ -62,9 +67,18 @@ func (p *GeminiPTYProvider) StartSession(ctx context.Context, workingDir string)
 		"Type your message",
 	}
 
+	// DEBUG: Print what we're looking for
+	fmt.Fprintf(os.Stderr, "[GEMINI DEBUG] Looking for ready patterns: %v\n", readyPatterns)
+
 	if err := p.automator.WaitForReady(ctx, readyPatterns); err != nil {
+		// DEBUG: Print the actual output we got
+		currentOutput := string(p.session.GetOutput())
+		fmt.Fprintf(os.Stderr, "[GEMINI DEBUG] Failed to find ready pattern. Current output:\n%q\n", currentOutput)
 		return fmt.Errorf("Gemini did not become ready: %w", err)
 	}
+
+	// DEBUG: Print successful ready detection
+	fmt.Fprintf(os.Stderr, "[GEMINI DEBUG] Gemini is ready!\n")
 
 	return nil
 }

@@ -284,18 +284,20 @@ func (e *InteractiveExecutor) executeInteractiveAgent(ctx context.Context, agent
 	}
 	defer ptmx.Close()
 
-	// Handle pty size changes
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, syscall.SIGWINCH)
-	go func() {
-		for range ch {
-			if err := pty.InheritSize(os.Stdin, ptmx); err != nil {
-				fmt.Fprintf(os.Stderr, "error resizing pty: %v\n", err)
+	// Handle pty size changes only if running in a terminal
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, syscall.SIGWINCH)
+		go func() {
+			for range ch {
+				if err := pty.InheritSize(os.Stdin, ptmx); err != nil {
+					fmt.Fprintf(os.Stderr, "error resizing pty: %v\n", err)
+				}
 			}
-		}
-	}()
-	ch <- syscall.SIGWINCH // Initial resize
-	defer func() { signal.Stop(ch); close(ch) }()
+		}()
+		ch <- syscall.SIGWINCH // Initial resize
+		defer func() { signal.Stop(ch); close(ch) }()
+	}
 
 	// Set terminal to raw mode
 	var oldState *term.State
@@ -338,23 +340,49 @@ func (e *InteractiveExecutor) executeInteractiveAgent(ctx context.Context, agent
 				
 				currentOutput := outputBuffer.String()
 				
-				// Check if we should inject prompt - look for prompt box
-				// Pattern can have regular space, non-breaking space, or be part of styled output
-				if !promptInjected && strings.Contains(currentOutput, "│") && strings.Contains(currentOutput, ">") {
-					// More specific check - look for the prompt line pattern
-					if strings.Contains(currentOutput, "│\u00a0>") || 
-					   strings.Contains(currentOutput, "│ >") || 
-					   strings.Contains(currentOutput, "\u00a0>\u00a0") {
-						promptInjected = true
-						// Small delay to ensure UI is ready
-						go func() {
-							time.Sleep(500 * time.Millisecond)
-							// Type the prompt character by character
-							for _, char := range prompt {
-								ptmx.Write([]byte(string(char)))
-								time.Sleep(5 * time.Millisecond)
+				// Check if we should inject prompt based on provider
+				if !promptInjected {
+					switch agent.Provider {
+					case "claude":
+						// Claude prompt detection - original logic
+						if strings.Contains(currentOutput, "│") && strings.Contains(currentOutput, ">") {
+							// More specific check - look for the prompt line pattern
+							if strings.Contains(currentOutput, "│\u00a0>") || 
+							   strings.Contains(currentOutput, "│ >") || 
+							   strings.Contains(currentOutput, "\u00a0>\u00a0") {
+								promptInjected = true
+								// Small delay to ensure UI is ready
+								go func() {
+									time.Sleep(500 * time.Millisecond)
+									// Type the prompt character by character
+									for _, char := range prompt {
+										ptmx.Write([]byte(string(char)))
+										time.Sleep(5 * time.Millisecond)
+									}
+								}()
 							}
-						}()
+						}
+					
+					case "gemini":
+						// Gemini prompt detection - needs ANSI stripping
+						// Strip ANSI escape sequences to check for patterns
+						ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*m`)
+						strippedOutput := ansiRegex.ReplaceAllString(currentOutput, "")
+						
+						// Check for the prompt pattern in stripped output
+						// The actual pattern is "│ > " with a space between pipe and arrow
+						if strings.Contains(strippedOutput, "│ > ") {
+							promptInjected = true
+							// Longer delay to ensure UI is fully ready and won't cut off the beginning
+							go func() {
+								time.Sleep(2 * time.Second)
+								// Type the prompt character by character
+								for _, char := range prompt {
+									ptmx.Write([]byte(string(char)))
+									time.Sleep(10 * time.Millisecond) // Also slow down typing a bit
+								}
+							}()
+						}
 					}
 				}
 				promptMutex.Unlock()

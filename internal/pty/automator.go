@@ -19,6 +19,7 @@ package pty
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -42,10 +43,13 @@ func NewAutomator(session *Session) *Automator {
 
 // SendPromptWithCopy sends a prompt using copy/paste method
 func (a *Automator) SendPromptWithCopy(ctx context.Context, prompt string) error {
+	fmt.Fprintf(os.Stderr, "[AUTOMATOR DEBUG] SendPromptWithCopy called with prompt length: %d\n", len(prompt))
+	
 	// Copy prompt to clipboard
 	if err := a.clipboard.Copy(prompt); err != nil {
 		return fmt.Errorf("failed to copy to clipboard: %w", err)
 	}
+	fmt.Fprintf(os.Stderr, "[AUTOMATOR DEBUG] Copied to clipboard successfully\n")
 
 	// Small delay to ensure clipboard is ready
 	time.Sleep(100 * time.Millisecond)
@@ -54,6 +58,7 @@ func (a *Automator) SendPromptWithCopy(ctx context.Context, prompt string) error
 	if err := a.sendPasteCommand(); err != nil {
 		return fmt.Errorf("failed to send paste command: %w", err)
 	}
+	fmt.Fprintf(os.Stderr, "[AUTOMATOR DEBUG] Sent paste command\n")
 
 	// Wait for the prompt to appear in the output
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -63,7 +68,9 @@ func (a *Automator) SendPromptWithCopy(ctx context.Context, prompt string) error
 	time.Sleep(500 * time.Millisecond)
 
 	// Send enter
-	return a.session.SendEnter()
+	err := a.session.SendEnter()
+	fmt.Fprintf(os.Stderr, "[AUTOMATOR DEBUG] Sent enter key, error: %v\n", err)
+	return err
 }
 
 // sendPasteCommand sends the appropriate paste command for the OS
@@ -105,6 +112,7 @@ func (a *Automator) WaitForReadyWithTimeout(ctx context.Context, readyPatterns [
 	defer ticker.Stop()
 
 	timer := time.After(timeout)
+	lastLen := 0 // DEBUG: Track output length changes
 
 	for {
 		select {
@@ -114,8 +122,14 @@ func (a *Automator) WaitForReadyWithTimeout(ctx context.Context, readyPatterns [
 			return fmt.Errorf("timeout waiting for ready prompt after %v", timeout)
 		case <-ticker.C:
 			output := a.session.GetOutput()
+			// DEBUG: Show what we're checking periodically (only if output changes)
+			if len(output) != lastLen {
+				lastLen = len(output)
+				fmt.Fprintf(os.Stderr, "[AUTOMATOR DEBUG] Buffer update (len=%d): %q\n", len(output), string(output))
+			}
 			for _, pattern := range patterns {
 				if ContainsPattern(output, pattern) {
+					fmt.Fprintf(os.Stderr, "[AUTOMATOR DEBUG] Found pattern: %q\n", string(pattern))
 					return nil
 				}
 			}

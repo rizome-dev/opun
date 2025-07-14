@@ -109,18 +109,20 @@ func runChat(cmd *cobra.Command, args []string) error {
 	}
 	defer func() { _ = ptmx.Close() }()
 
-	// Handle pty size changes
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, syscall.SIGWINCH)
-	go func() {
-		for range ch {
-			if err := pty.InheritSize(os.Stdin, ptmx); err != nil {
-				fmt.Fprintf(os.Stderr, "error resizing pty: %v\n", err)
+	// Handle pty size changes only if running in a terminal
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, syscall.SIGWINCH)
+		go func() {
+			for range ch {
+				if err := pty.InheritSize(os.Stdin, ptmx); err != nil {
+					fmt.Fprintf(os.Stderr, "error resizing pty: %v\n", err)
+				}
 			}
-		}
-	}()
-	ch <- syscall.SIGWINCH // Initial resize
-	defer func() { signal.Stop(ch); close(ch) }()
+		}()
+		ch <- syscall.SIGWINCH // Initial resize
+		defer func() { signal.Stop(ch); close(ch) }()
+	}
 
 	// Set stdin to raw mode if it's a terminal
 	if term.IsTerminal(int(os.Stdin.Fd())) {
