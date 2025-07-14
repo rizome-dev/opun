@@ -1,4 +1,3 @@
-version: 2
 project_name: opun
 
 # Keep the full version including -nightly suffix
@@ -135,20 +134,16 @@ brews:
     homepage: https://github.com/rizome-dev/opun
     description: AI code agent automation framework (Nightly/Prerelease)
     license: MIT
-    # Use the full tag as version
-    version_template: "{{ .Tag }}"
     repository:
       owner: rizome-dev
       name: homebrew-brews
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    folder: Formula
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
     commit_msg_template: "Brew formula update for {{ .ProjectName }}-nightly version {{ .Tag }}"
-    folder: Formula
-    conflicts_with:
-      - opun
     test: |
       system "#{bin}/opun", "--version"
     install: |
@@ -156,6 +151,7 @@ brews:
       
       # Generate and install shell completions
       generate_completions_from_executable(bin/"opun", "completion")
+    conflicts_with: "opun", because: "both install the same binaries"
     caveats: |
       ⚠️  This is a nightly/prerelease version of opun.
       

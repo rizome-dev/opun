@@ -257,12 +257,12 @@ docker-run: docker-build ## Build and run Docker container
 .PHONY: release-dry-run
 release-dry-run: ## Perform a dry run of goreleaser
 	@echo "$(COLOR_BLUE)Running release dry run...$(COLOR_RESET)"
-	@goreleaser release --snapshot --skip-publish --clean
+	@goreleaser release --snapshot --skip-publish --rm-dist
 
 .PHONY: release
 release: ## Create a new release (requires tag)
 	@echo "$(COLOR_BLUE)Creating release...$(COLOR_RESET)"
-	@goreleaser release --clean
+	@goreleaser release --rm-dist
 
 .PHONY: tag-nightly
 tag-nightly: ## Create a nightly tag (usage: make tag-nightly VERSION=1.0.0)
