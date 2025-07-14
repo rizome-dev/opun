@@ -1,3 +1,4 @@
+version: 2
 project_name: opun
 
 # Keep the full version including -nightly suffix
