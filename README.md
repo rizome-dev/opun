@@ -33,6 +33,8 @@ Download the latest binary for your platform from the [releases page](https://gi
 ## Quick Start
 
 ```bash
+# If a fresh installation (configures default provider, default MCP servers, etc)
+opun setup
 
 # Initialize a chat session with the default provider -- or, specify the provider (chat {gemini,claude})
 opun chat
