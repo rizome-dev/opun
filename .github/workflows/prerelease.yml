@@ -25,7 +25,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.24.0'
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -47,7 +47,7 @@ jobs:
         echo "Detected nightly tag: $TAG"
 
     - name: Run GoReleaser for Nightly
-      uses: goreleaser/goreleaser-action@v5
+      uses: goreleaser/goreleaser-action@v6
       with:
         distribution: goreleaser
         version: latest
