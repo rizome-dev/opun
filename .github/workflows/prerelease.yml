@@ -47,10 +47,10 @@ jobs:
         echo "Detected nightly tag: $TAG"
 
     - name: Run GoReleaser for Nightly
-      uses: goreleaser/goreleaser-action@v5
+      uses: goreleaser/goreleaser-action@v6
       with:
         distribution: goreleaser
-        version: latest
+        version: "~> v2"
         args: release --clean --config .goreleaser.nightly.yml
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

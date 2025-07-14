@@ -1,5 +1,4 @@
 project_name: opun
-version: 2
 
 # Keep the full version including -nightly suffix
 git:
