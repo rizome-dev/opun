@@ -55,26 +55,12 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Check if nightly
-      id: check-nightly
-      run: |
-        TAG="${{ github.ref_name }}"
-        if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-nightly$ ]]; then
-          echo "is_nightly=true" >> $GITHUB_OUTPUT
-          echo "config_file=.goreleaser.nightly.yml" >> $GITHUB_OUTPUT
-          echo "Detected nightly tag: $TAG"
-        else
-          echo "is_nightly=false" >> $GITHUB_OUTPUT
-          echo "config_file=.goreleaser.yml" >> $GITHUB_OUTPUT
-          echo "Detected stable tag: $TAG"
-        fi
-
     - name: Run GoReleaser
       uses: goreleaser/goreleaser-action@v5
       with:
         distribution: goreleaser
         version: latest
-        args: release --rm-dist --config ${{ steps.check-nightly.outputs.config_file }}
+        args: release --clean --config .goreleaser.yml
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

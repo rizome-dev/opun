@@ -1,9 +1,6 @@
-project_name: opun
+version: 2
 
-# Keep the full version including -nightly suffix
-git:
-  # Don't strip prerelease suffix
-  prerelease_suffix: "-"
+project_name: opun
 
 before:
   hooks:
@@ -28,10 +25,9 @@ builds:
         goarch: arm64
     ldflags:
       - -s -w
-      - -X main.version={{.Tag}}
+      - -X main.version={{.Version}}
       - -X main.commit={{.Commit}}
       - -X main.buildTime={{.Date}}
-      - -X main.prerelease=true
 
 archives:
   - id: opun
@@ -41,7 +37,6 @@ archives:
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
-      {{- if .IsSnapshot }}-SNAPSHOT{{ end }}
     format_overrides:
       - goos: windows
         format: zip
@@ -139,11 +134,11 @@ brews:
       name: homebrew-brews
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    folder: Formula
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
     commit_msg_template: "Brew formula update for {{ .ProjectName }}-nightly version {{ .Tag }}"
+    directory: Formula
     test: |
       system "#{bin}/opun", "--version"
     install: |
@@ -151,14 +146,8 @@ brews:
       
       # Generate and install shell completions
       generate_completions_from_executable(bin/"opun", "completion")
-    conflicts_with: "opun", because: "both install the same binaries"
-    caveats: |
-      ⚠️  This is a nightly/prerelease version of opun.
-      
-      Version: {{ .Tag }}
-      
-      For the stable version, use:
-        brew install opun
+    conflicts:
+      - opun
 
 dockers:
   - image_templates:

@@ -1,3 +1,5 @@
+version: 2
+
 project_name: opun
 
 before:
@@ -134,7 +136,7 @@ brews:
       name: goreleaserbot
       email: bot@goreleaser.com
     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
-    folder: Formula
+    directory: Formula
     # Skip homebrew update for prereleases
     skip_upload: auto
     test: |
