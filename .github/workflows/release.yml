@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+      - '!v*-nightly'  # Exclude nightly tags (handled by prerelease.yml)
 
 permissions:
   contents: write
@@ -54,16 +55,16 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Check if prerelease
-      id: check-prerelease
+    - name: Check if nightly
+      id: check-nightly
       run: |
         TAG="${{ github.ref_name }}"
-        if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-[a-zA-Z0-9]+.*$ ]]; then
-          echo "is_prerelease=true" >> $GITHUB_OUTPUT
+        if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-nightly$ ]]; then
+          echo "is_nightly=true" >> $GITHUB_OUTPUT
           echo "config_file=.goreleaser.nightly.yml" >> $GITHUB_OUTPUT
-          echo "Detected prerelease tag: $TAG"
+          echo "Detected nightly tag: $TAG"
         else
-          echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          echo "is_nightly=false" >> $GITHUB_OUTPUT
           echo "config_file=.goreleaser.yml" >> $GITHUB_OUTPUT
           echo "Detected stable tag: $TAG"
         fi
@@ -73,7 +74,7 @@ jobs:
       with:
         distribution: goreleaser
         version: latest
-        args: release --clean --config ${{ steps.check-prerelease.outputs.config_file }}
+        args: release --clean --config ${{ steps.check-nightly.outputs.config_file }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

@@ -1,4 +1,10 @@
 project_name: opun
+version: 2
+
+# Keep the full version including -nightly suffix
+git:
+  # Don't strip prerelease suffix
+  prerelease_suffix: "-"
 
 before:
   hooks:
@@ -23,7 +29,7 @@ builds:
         goarch: arm64
     ldflags:
       - -s -w
-      - -X main.version={{.Version}}
+      - -X main.version={{.Tag}}
       - -X main.commit={{.Commit}}
       - -X main.buildTime={{.Date}}
       - -X main.prerelease=true
@@ -129,6 +135,8 @@ brews:
     homepage: https://github.com/rizome-dev/opun
     description: AI code agent automation framework (Nightly/Prerelease)
     license: MIT
+    # Use the full tag as version
+    version_template: "{{ .Tag }}"
     repository:
       owner: rizome-dev
       name: homebrew-brews
@@ -149,7 +157,9 @@ brews:
       # Generate and install shell completions
       generate_completions_from_executable(bin/"opun", "completion")
     caveats: |
-      ⚠️  This is a prerelease version of opun.
+      ⚠️  This is a nightly/prerelease version of opun.
+      
+      Version: {{ .Tag }}
       
       For the stable version, use:
         brew install opun

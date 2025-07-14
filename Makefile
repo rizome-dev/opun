@@ -264,22 +264,22 @@ release: ## Create a new release (requires tag)
 	@echo "$(COLOR_BLUE)Creating release...$(COLOR_RESET)"
 	@goreleaser release --rm-dist
 
-.PHONY: tag-prerelease
-tag-prerelease: ## Create a prerelease tag (usage: make tag-prerelease VERSION=1.0.0-rc1)
+.PHONY: tag-nightly
+tag-nightly: ## Create a nightly tag (usage: make tag-nightly VERSION=1.0.0)
 	@if [ -z "$(VERSION)" ]; then \
 		echo "$(COLOR_RED)Error: VERSION is required$(COLOR_RESET)"; \
-		echo "Usage: make tag-prerelease VERSION=1.0.0-rc1"; \
+		echo "Usage: make tag-nightly VERSION=1.0.0"; \
 		exit 1; \
 	fi
-	@if [[ ! "$(VERSION)" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[a-zA-Z0-9]+.*$$ ]]; then \
-		echo "$(COLOR_RED)Error: Invalid prerelease version format$(COLOR_RESET)"; \
-		echo "Expected format: X.Y.Z-identifier (e.g., 1.0.0-rc1, 2.1.0-beta)"; \
+	@if [[ ! "$(VERSION)" =~ ^[0-9]+\.[0-9]+\.[0-9]+$$ ]]; then \
+		echo "$(COLOR_RED)Error: Invalid version format$(COLOR_RESET)"; \
+		echo "Expected format: X.Y.Z (e.g., 1.0.0, 2.1.0)"; \
 		exit 1; \
 	fi
-	@echo "$(COLOR_BLUE)Creating prerelease tag v$(VERSION)...$(COLOR_RESET)"
-	@git tag -a "v$(VERSION)" -m "Prerelease v$(VERSION)"
-	@echo "$(COLOR_GREEN)✓ Tag created: v$(VERSION)$(COLOR_RESET)"
-	@echo "$(COLOR_YELLOW)Push with: git push origin v$(VERSION)$(COLOR_RESET)"
+	@echo "$(COLOR_BLUE)Creating nightly tag v$(VERSION)-nightly...$(COLOR_RESET)"
+	@git tag -a "v$(VERSION)-nightly" -m "Nightly release v$(VERSION)"
+	@echo "$(COLOR_GREEN)✓ Tag created: v$(VERSION)-nightly$(COLOR_RESET)"
+	@echo "$(COLOR_YELLOW)Push with: git push origin v$(VERSION)-nightly$(COLOR_RESET)"
 
 # Opun-specific targets
 .PHONY: refactor-sessions-clean
