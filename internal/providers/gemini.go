@@ -154,12 +154,12 @@ func (p *GeminiProvider) CleanupSession(ctx context.Context, sessionID string) e
 
 // GetReadyPattern returns the pattern indicating Gemini is ready
 func (p *GeminiProvider) GetReadyPattern() string {
-	return ">"
+	return "│ >"
 }
 
 // GetOutputPattern returns the pattern indicating output completion
 func (p *GeminiProvider) GetOutputPattern() string {
-	return ">"
+	return "│ >"
 }
 
 // GetErrorPattern returns the pattern indicating an error
@@ -281,10 +281,8 @@ func (p *GeminiProvider) CloseSession() error {
 // GetReadyPatterns returns patterns that indicate Gemini is ready
 func (p *GeminiProvider) GetReadyPatterns() []string {
 	return []string{
-		"You:",
-		"Gemini>",
-		">>>",
-		"$",
+		"│ >",
+		"Type your message",
 	}
 }
 

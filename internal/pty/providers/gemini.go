@@ -58,10 +58,8 @@ func (p *GeminiPTYProvider) StartSession(ctx context.Context, workingDir string)
 
 	// Wait for Gemini to be ready
 	readyPatterns := []string{
-		"Gemini>",
-		"gemini>",
-		">",
-		"$",
+		"│ >",
+		"Type your message",
 	}
 
 	if err := p.automator.WaitForReady(ctx, readyPatterns); err != nil {
@@ -88,10 +86,7 @@ func (p *GeminiPTYProvider) SendPrompt(ctx context.Context, prompt string) (stri
 	// Wait for Gemini to finish responding
 	// Look for patterns that indicate Gemini is ready for the next input
 	responseComplete := []string{
-		"Gemini>",
-		"gemini>",
-		">",
-		"$",
+		"│ >",
 	}
 
 	// Give Gemini time to start responding
@@ -134,7 +129,7 @@ func (p *GeminiPTYProvider) IsReady() bool {
 	}
 
 	output := string(p.session.GetOutput())
-	readyPatterns := []string{"Gemini>", "gemini>", ">", "$"}
+	readyPatterns := []string{"│ >"}
 
 	for _, pattern := range readyPatterns {
 		if strings.Contains(output, pattern) {
@@ -168,10 +163,7 @@ func (p *GeminiPTYProvider) extractGeminiResponse(output string) string {
 		// Once we've found the prompt, collect response lines
 		if promptFound {
 			// Stop at prompt indicators
-			if strings.Contains(line, "Gemini>") ||
-				strings.Contains(line, "gemini>") ||
-				strings.HasPrefix(strings.TrimSpace(line), ">") ||
-				strings.HasPrefix(strings.TrimSpace(line), "$") {
+			if strings.Contains(line, "│ >") {
 				break
 			}
 			responseLines = append(responseLines, line)

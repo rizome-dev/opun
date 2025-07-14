@@ -314,37 +314,59 @@ func (e *InteractiveExecutor) executeInteractiveAgent(ctx context.Context, agent
 		}()
 	}
 
-	// Schedule prompt injection after provider is ready
-	go func() {
-		// Simple delay-based approach that doesn't interfere with I/O
-		switch agent.Provider {
-		case "claude":
-			// Claude is usually ready after 2-3 seconds
-			time.Sleep(3 * time.Second)
-		case "gemini":
-			// Gemini may need more time if auth/theme selection is required
-			time.Sleep(5 * time.Second)
-		default:
-			time.Sleep(3 * time.Second)
-		}
-
-		// Type the prompt character by character
-		for _, char := range prompt {
-			ptmx.Write([]byte(string(char)))
-			time.Sleep(5 * time.Millisecond)
-		}
-	}()
+	// Track output and inject prompt when ready
+	outputBuffer := &strings.Builder{}
+	promptInjected := false
+	promptMutex := &sync.Mutex{}
 
 	// Simple bidirectional copy with context cancellation
 	errChan := make(chan error, 2)
 	doneChan := make(chan struct{})
 
-	// Copy PTY output to stdout
+	// Copy PTY output to stdout and detect ready state
 	go func() {
-		_, err := io.Copy(os.Stdout, ptmx)
-		select {
-		case errChan <- err:
-		case <-doneChan:
+		buf := make([]byte, 1024)
+		for {
+			n, err := ptmx.Read(buf)
+			if n > 0 {
+				// Write to stdout
+				os.Stdout.Write(buf[:n])
+				
+				// Accumulate output for ready detection
+				promptMutex.Lock()
+				outputBuffer.Write(buf[:n])
+				
+				currentOutput := outputBuffer.String()
+				
+				// Check if we should inject prompt - look for prompt box
+				// Pattern can have regular space, non-breaking space, or be part of styled output
+				if !promptInjected && strings.Contains(currentOutput, "│") && strings.Contains(currentOutput, ">") {
+					// More specific check - look for the prompt line pattern
+					if strings.Contains(currentOutput, "│\u00a0>") || 
+					   strings.Contains(currentOutput, "│ >") || 
+					   strings.Contains(currentOutput, "\u00a0>\u00a0") {
+						promptInjected = true
+						// Small delay to ensure UI is ready
+						go func() {
+							time.Sleep(500 * time.Millisecond)
+							// Type the prompt character by character
+							for _, char := range prompt {
+								ptmx.Write([]byte(string(char)))
+								time.Sleep(5 * time.Millisecond)
+							}
+						}()
+					}
+				}
+				promptMutex.Unlock()
+			}
+			
+			if err != nil {
+				select {
+				case errChan <- err:
+				case <-doneChan:
+				}
+				return
+			}
 		}
 	}()
 
@@ -365,16 +387,7 @@ func (e *InteractiveExecutor) executeInteractiveAgent(ctx context.Context, agent
 					return
 				}
 
-				// Always pass through the entire buffer first (non-blocking)
-				if _, err := ptmx.Write(buf[:n]); err != nil {
-					select {
-					case errChan <- err:
-					case <-doneChan:
-					}
-					return
-				}
-
-				// Now check for Ctrl+C to count (non-blocking side effect)
+				// First check for Ctrl+C to count (non-blocking)
 				for i := 0; i < n; i++ {
 					if buf[i] == 0x03 { // Ctrl+C
 						e.ctrlCMutex.Lock()
@@ -406,6 +419,15 @@ func (e *InteractiveExecutor) executeInteractiveAgent(ctx context.Context, agent
 							return
 						}
 					}
+				}
+
+				// Then pass through the entire buffer to PTY
+				if _, err := ptmx.Write(buf[:n]); err != nil {
+					select {
+					case errChan <- err:
+					case <-doneChan:
+					}
+					return
 				}
 			}
 		}
