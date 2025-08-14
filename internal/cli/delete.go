@@ -883,3 +883,4 @@ func selectItemToDelete(items []deleteItem, itemType string) (*deleteItem, error
 
 	return nil, fmt.Errorf("no selection made")
 }
+
