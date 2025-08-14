@@ -17,6 +17,7 @@ package cli
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,6 +30,7 @@ import (
 	"github.com/rizome-dev/opun/internal/tools"
 	"github.com/rizome-dev/opun/internal/workflow"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 // UpdateCmd creates the update command
@@ -249,6 +251,7 @@ const (
 	updateAddTypeWorkflow updateAddType = iota
 	updateAddTypePrompt
 	updateAddTypeAction
+	updateAddTypeTool
 )
 
 // updateTypeItem represents a selectable item in the list
@@ -380,46 +383,357 @@ func runInteractiveUpdate() error {
 		return err
 	}
 
-	// Step 4: Get new file path
-	path, err := FilePrompt(fmt.Sprintf("Select the new file for %s '%s':", typeChoice, selectedItem.name))
+	// Step 4: Ask user if they want to replace with a new file or edit interactively
+	updateMethod, err := selectUpdateMethod()
 	if err != nil {
 		return err
 	}
-	if path == "" {
-		return fmt.Errorf("path cannot be empty")
-	}
 
-	// Check if file exists
-	if _, err := os.Stat(path); err != nil {
-		return fmt.Errorf("file not found: %s", path)
-	}
+	if updateMethod == "file" {
+		// Step 4a: Get new file path
+		path, err := FilePrompt(fmt.Sprintf("Select the new file for %s '%s':", typeChoice, selectedItem.name))
+		if err != nil {
+			return err
+		}
+		if path == "" {
+			return fmt.Errorf("path cannot be empty")
+		}
 
-	// Step 5: Confirm update
-	confirm, err := Confirm(fmt.Sprintf("Update %s '%s' with contents from %s?", typeChoice, selectedItem.name, filepath.Base(path)))
-	if err != nil {
-		return err
-	}
-	if !confirm {
-		fmt.Println("Update cancelled.")
-		return nil
-	}
+		// Check if file exists
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return fmt.Errorf("file not found: %s", path)
+		}
 
-	// Step 6: Execute the update
-	fmt.Printf("\n📝 Updating %s...\n", typeChoice)
+		// Step 5a: Confirm update
+		confirm, err := Confirm(fmt.Sprintf("Update %s '%s' with contents from %s?", typeChoice, selectedItem.name, filepath.Base(path)))
+		if err != nil {
+			return err
+		}
+		if !confirm {
+			fmt.Println("Update cancelled.")
+			return nil
+		}
 
-	switch typeChoice {
-	case "workflow":
-		return updateWorkflow(selectedItem.name, path)
-	case "prompt":
-		return updatePrompt(selectedItem.name, path)
-	case "tool":
-		return updateAction(selectedItem.name, path)
-	default:
-		return fmt.Errorf("unknown type: %s", typeChoice)
+		// Step 6a: Execute the update
+		fmt.Printf("\n📝 Updating %s...\n", typeChoice)
+
+		switch typeChoice {
+		case "workflow":
+			return updateWorkflow(selectedItem.name, path)
+		case "prompt":
+			return updatePrompt(selectedItem.name, path)
+		case "tool":
+			return updateAction(selectedItem.name, path)
+		default:
+			return fmt.Errorf("unknown type: %s", typeChoice)
+		}
+	} else {
+		// Step 4b: Execute interactive update
+		return runInteractiveEdit(selectedItem)
 	}
 }
 
-// selectUpdateType lets user choose between workflow, prompt, and tool
+func selectUpdateMethod() (string, error) {
+	items := []list.Item{
+		updateTypeItem{
+			title:       "Replace with a new file",
+			description: "Update the component from a local file",
+		},
+		updateTypeItem{
+			title:       "Edit interactively",
+			description: "Edit the component fields interactively",
+		},
+	}
+
+	const defaultWidth = 60
+	listHeight := len(items)*3 + 8
+
+	l := list.New(items, list.NewDefaultDelegate(), defaultWidth, listHeight)
+	l.Title = "How would you like to update the component?"
+	l.SetShowStatusBar(false)
+	l.SetFilteringEnabled(false)
+	l.SetShowPagination(false)
+	l.Styles.Title = lipgloss.NewStyle().
+		Background(lipgloss.Color("62")).
+		Foreground(lipgloss.Color("230")).
+		Padding(0, 1)
+
+	model := addModel{list: l, state: "choosing"}
+
+	p := tea.NewProgram(model)
+	result, err := p.Run()
+	if err != nil {
+		return "", err
+	}
+
+	if m, ok := result.(addModel); ok && m.choice != nil {
+		if m.choice.title == "Replace with a new file" {
+			return "file", nil
+		} else {
+			return "interactive", nil
+		}
+	}
+
+	return "", fmt.Errorf("no selection made")
+}
+
+func runInteractiveEdit(item *updateItem) error {
+	switch item.itemType {
+	case "action":
+		return handleInteractiveActionEdit(item)
+	case "tool":
+		return handleInteractiveToolEdit(item)
+	case "prompt":
+		return handleInteractivePromptEdit(item)
+	case "workflow":
+		return handleInteractiveWorkflowEdit(item)
+	}
+	return nil
+}
+
+func handleInteractiveWorkflowEdit(item *updateItem) error {
+	// Get workflows directory
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	
+	workflowsDir := filepath.Join(home, ".opun", "workflows")
+	workflowPath := filepath.Join(workflowsDir, item.name+".yaml")
+	
+	// Read existing workflow
+	data, err := os.ReadFile(workflowPath)
+	if err != nil {
+		return fmt.Errorf("failed to read workflow file: %w", err)
+	}
+	
+	var workflow map[string]interface{}
+	if err := yaml.Unmarshal(data, &workflow); err != nil {
+		return fmt.Errorf("failed to unmarshal workflow yaml: %w", err)
+	}
+	
+	// Edit basic info
+	name, err := PromptWithDefault("Enter a new name for the workflow:", getStringField(workflow, "name"))
+	if err != nil {
+		return err
+	}
+	
+	description, err := PromptWithDefault("Enter a new description for the workflow:", getStringField(workflow, "description"))
+	if err != nil {
+		return err
+	}
+	
+	command, err := PromptWithDefault("Enter a new command name:", getStringField(workflow, "command"))
+	if err != nil {
+		return err
+	}
+	
+	// Update workflow
+	workflow["name"] = name
+	workflow["description"] = description
+	workflow["command"] = command
+	
+	// Ask if user wants to edit agents
+	editAgents, err := Confirm("Do you want to edit the agents in this workflow?")
+	if err != nil {
+		return err
+	}
+	
+	if editAgents {
+		// This would be complex to implement fully - for now just show info
+		fmt.Println("Agent editing in interactive mode is not yet fully implemented.")
+		fmt.Println("For now, you can update the workflow file directly or use the file replacement option.")
+	}
+	
+	newData, err := yaml.Marshal(workflow)
+	if err != nil {
+		return fmt.Errorf("failed to marshal workflow to yaml: %w", err)
+	}
+	
+	// Save updated workflow
+	if err := os.WriteFile(workflowPath, newData, 0644); err != nil {
+		return fmt.Errorf("failed to save workflow: %w", err)
+	}
+	
+	fmt.Printf("✓ Updated workflow '%s'\n", name)
+	
+	return nil
+}
+
+func getStringField(m map[string]interface{}, key string) string {
+	if val, ok := m[key]; ok {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return ""
+}
+
+func handleInteractivePromptEdit(item *updateItem) error {
+	// Get prompt garden
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	gardenPath := filepath.Join(home, ".opun", "promptgarden")
+	garden, err := promptgarden.NewGarden(gardenPath)
+	if err != nil {
+		return fmt.Errorf("failed to access prompt garden: %w", err)
+	}
+
+	// Get existing prompt
+	prompt, err := garden.GetPrompt(item.name)
+	if err != nil {
+		return fmt.Errorf("failed to get prompt: %w", err)
+	}
+
+	// Prompt for new values
+	name, err := PromptWithDefault("Enter a new name for the prompt:", prompt.Name)
+	if err != nil {
+		return err
+	}
+
+	description, err := PromptWithDefault("Enter a new description for the prompt:", prompt.Metadata.Description)
+	if err != nil {
+		return err
+	}
+
+	content, err := MultilinePrompt("Enter the new prompt content:")
+	if err != nil {
+		return fmt.Errorf("failed to read prompt content: %w", err)
+	}
+
+	// Update prompt
+	prompt.Name = name
+	prompt.Metadata.Description = description
+	prompt.Content = content
+
+	// Save updated prompt
+	if err := garden.SavePrompt(prompt); err != nil {
+		return fmt.Errorf("failed to save prompt: %w", err)
+	}
+
+	fmt.Printf("✓ Updated prompt '%s'\n", name)
+
+	return nil
+}
+
+func handleInteractiveToolEdit(item *updateItem) error {
+	// Get tools directory
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	toolsDir := filepath.Join(home, ".opun", "tools")
+	toolPath := filepath.Join(toolsDir, item.name+".yaml")
+
+	// Read existing tool
+	data, err := os.ReadFile(toolPath)
+	if err != nil {
+		return fmt.Errorf("failed to read tool file: %w", err)
+	}
+
+	var tool map[string]interface{}
+	if err := yaml.Unmarshal(data, &tool); err != nil {
+		return fmt.Errorf("failed to unmarshal tool yaml: %w", err)
+	}
+
+	// Prompt for new values
+	name, err := PromptWithDefault("Enter a new name for the tool:", tool["name"].(string))
+	if err != nil {
+		return err
+	}
+
+	description, err := PromptWithDefault("Enter a new description for the tool:", tool["description"].(string))
+	if err != nil {
+		return err
+	}
+
+	// Update tool
+	tool["name"] = name
+	tool["description"] = description
+
+	newData, err := yaml.Marshal(tool)
+	if err != nil {
+		return fmt.Errorf("failed to marshal tool to yaml: %w", err)
+	}
+
+	// Save updated tool
+	if err := os.WriteFile(toolPath, newData, 0644); err != nil {
+		return fmt.Errorf("failed to save tool: %w", err)
+	}
+
+	fmt.Printf("✓ Updated tool '%s'\n", name)
+
+	return nil
+}
+
+func handleInteractiveActionEdit(item *updateItem) error {
+	// Get actions directory
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	actionsDir := filepath.Join(home, ".opun", "actions")
+	actionPath := filepath.Join(actionsDir, item.name+".yaml")
+
+	// Read existing action
+	data, err := os.ReadFile(actionPath)
+	if err != nil {
+		return fmt.Errorf("failed to read action file: %w", err)
+	}
+
+	var action map[string]interface{}
+	if err := yaml.Unmarshal(data, &action); err != nil {
+		return fmt.Errorf("failed to unmarshal action yaml: %w", err)
+	}
+
+	// Prompt for new values
+	name, err := PromptWithDefault("Enter a new name for the action:", action["name"].(string))
+	if err != nil {
+		return err
+	}
+
+	description, err := PromptWithDefault("Enter a new description for the action:", action["description"].(string))
+	if err != nil {
+		return err
+	}
+
+	command, err := PromptWithDefault("Enter a new command to execute:", action["command"].(string))
+	if err != nil {
+		return err
+	}
+
+	args, err := PromptWithDefault("Enter new arguments for the command (space-separated):", strings.Join(action["args"].([]string), " "))
+	if err != nil {
+		return err
+	}
+
+	// Update action
+	action["name"] = name
+	action["description"] = description
+	action["command"] = command
+	action["args"] = strings.Split(args, " ")
+
+	newData, err := yaml.Marshal(action)
+	if err != nil {
+		return fmt.Errorf("failed to marshal action to yaml: %w", err)
+	}
+
+	// Save updated action
+	if err := os.WriteFile(actionPath, newData, 0644); err != nil {
+		return fmt.Errorf("failed to save action: %w", err)
+	}
+
+	fmt.Printf("✓ Updated action '%s'\n", name)
+
+	return nil
+}
+
+// selectUpdateType lets user choose between workflow, prompt, action, and tool
 func selectUpdateType() (string, error) {
 	items := []list.Item{
 		updateTypeItem{
@@ -436,6 +750,11 @@ func selectUpdateType() (string, error) {
 			title:       "Action",
 			description: "Update an existing action",
 			addType:     updateAddTypeAction,
+		},
+		updateTypeItem{
+			title:       "Tool",
+			description: "Update an existing tool",
+			addType:     updateAddTypeTool,
 		},
 	}
 
@@ -468,6 +787,8 @@ func selectUpdateType() (string, error) {
 			return "prompt", nil
 		case updateAddTypeAction:
 			return "action", nil
+		case updateAddTypeTool:
+			return "tool", nil
 		}
 	}
 
@@ -663,3 +984,18 @@ func selectItemToUpdate(items []updateItem, itemType string) (*updateItem, error
 
 	return nil, fmt.Errorf("no selection made")
 }
+
+func PromptWithDefault(prompt, defaultValue string) (string, error) {
+	fmt.Printf("%s (%s) ", prompt, defaultValue)
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return defaultValue, nil
+	}
+	return input, nil
+}
+

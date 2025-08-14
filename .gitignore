@@ -4,6 +4,7 @@ workflow*/
 !internal/workflow/
 !pkg/workflow/
 .claude/
+test-results/
 
 # Binaries for programs and plugins
 *.exe
