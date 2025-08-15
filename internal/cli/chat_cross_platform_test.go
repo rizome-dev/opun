@@ -50,7 +50,6 @@ providers:
 	t.Run("runChat exists on all platforms", func(t *testing.T) {
 		// In CI, Claude might be installed, which causes issues
 		// So we'll test with a non-existent provider instead
-		args := []string{"nonexistent-provider"}
 
 		// Create config for the non-existent provider to avoid config errors
 		configPath := filepath.Join(opunDir, "config.yaml")
@@ -62,7 +61,7 @@ providers:
 		require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0644))
 
 		// We expect an error because the provider won't exist
-		err := runChat(cmd, args)
+		err := runChat(cmd, "nonexistent-provider", []string{})
 		assert.Error(t, err)
 
 		// The error should be about unsupported provider
@@ -101,8 +100,7 @@ providers:
 		}
 		require.NoError(t, os.WriteFile(mockFile, content, 0755))
 
-		args := []string{"claude"}
-		err := runChat(cmd, args)
+		err := runChat(cmd, "claude", []string{})
 
 		// The result depends on whether the mock script works as a PTY
 		// If err is nil, that means our mock was found and executed

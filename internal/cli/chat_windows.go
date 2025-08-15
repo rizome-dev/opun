@@ -17,8 +17,8 @@ import (
 	"golang.org/x/term"
 )
 
-func runChat(cmd *cobra.Command, args []string) error {
-	provider := strings.ToLower(args[0])
+func runChat(cmd *cobra.Command, provider string, providerArgs []string) error {
+	provider = strings.ToLower(provider)
 
 	// Load actions from the actions directory
 	homeDir, err := os.UserHomeDir()
@@ -92,7 +92,10 @@ func runChat(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unsupported provider: %s", provider)
 	}
 
-	// Create command with prepared environment
+	// Append provider arguments to command arguments
+	commandArgs = append(commandArgs, providerArgs...)
+	
+	// Create command with prepared environment and provider arguments
 	// #nosec G204 -- command is hardcoded based on provider type
 	c := exec.Command(command, commandArgs...)
 	c.Dir = env.WorkingDir
