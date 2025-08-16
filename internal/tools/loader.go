@@ -81,8 +81,11 @@ func (l *Loader) LoadAll() error {
 
 		path := filepath.Join(l.toolsDir, entry.Name())
 		if err := l.LoadFile(path); err != nil {
-			// Log error but continue loading other tools
-			fmt.Fprintf(os.Stderr, "Warning: failed to load tool %s: %v\n", entry.Name(), err)
+			// Suppress warnings in MCP stdio mode to avoid interfering with JSON-RPC protocol
+			if os.Getenv("OPUN_MCP_STDIO") != "1" {
+				// Log error but continue loading other tools
+				fmt.Fprintf(os.Stderr, "Warning: failed to load tool %s: %v\n", entry.Name(), err)
+			}
 		}
 	}
 

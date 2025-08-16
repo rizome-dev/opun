@@ -88,13 +88,21 @@ func runChat(cmd *cobra.Command, provider string, providerArgs []string) error {
 		} else {
 			return fmt.Errorf("gemini command not found, please install Gemini CLI")
 		}
+	case "qwen":
+		if _, err := exec.LookPath("qwen"); err == nil {
+			command = "qwen"
+		} else if _, err := exec.LookPath("qwen.exe"); err == nil {
+			command = "qwen.exe"
+		} else {
+			return fmt.Errorf("qwen command not found, please install Qwen Code CLI")
+		}
 	default:
 		return fmt.Errorf("unsupported provider: %s", provider)
 	}
 
 	// Append provider arguments to command arguments
 	commandArgs = append(commandArgs, providerArgs...)
-	
+
 	// Create command with prepared environment and provider arguments
 	// #nosec G204 -- command is hardcoded based on provider type
 	c := exec.Command(command, commandArgs...)

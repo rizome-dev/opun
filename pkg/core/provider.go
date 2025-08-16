@@ -28,6 +28,7 @@ type ProviderType string
 const (
 	ProviderTypeClaude ProviderType = "claude"
 	ProviderTypeGemini ProviderType = "gemini"
+	ProviderTypeQwen   ProviderType = "qwen"
 	ProviderTypeMock   ProviderType = "mock"
 )
 
