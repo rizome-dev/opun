@@ -238,6 +238,11 @@ func selectProvider() (string, error) {
 			description: "Google's Gemini - powerful multimodal AI",
 			value:       "gemini",
 		},
+		providerItem{
+			name:        "Qwen",
+			description: "Qwen Code - optimized for coding tasks",
+			value:       "qwen",
+		},
 	}
 
 	// Calculate height to show all items with sufficient space
@@ -336,11 +341,12 @@ func installMCPServersShared(serverNames []string, provider string) error {
 
 	// Sync configuration to all providers
 	providers := []string{provider}
-	// Also sync to the other provider if user might use both
-	if provider == "claude" {
-		providers = append(providers, "gemini")
-	} else {
-		providers = append(providers, "claude")
+	// Also sync to the other providers if user might use them
+	allProviders := []string{"claude", "gemini", "qwen"}
+	for _, p := range allProviders {
+		if p != provider {
+			providers = append(providers, p)
+		}
 	}
 
 	if err := installer.SyncConfigurations(providers); err != nil {

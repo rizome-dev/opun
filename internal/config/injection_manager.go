@@ -89,6 +89,10 @@ func (m *InjectionManager) PrepareProviderEnvironment(provider string) (*Provide
 		if err := m.prepareGeminiEnvironment(env); err != nil {
 			return nil, fmt.Errorf("failed to prepare Gemini environment: %w", err)
 		}
+	case "qwen":
+		if err := m.prepareQwenEnvironment(env); err != nil {
+			return nil, fmt.Errorf("failed to prepare Qwen environment: %w", err)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}
@@ -146,6 +150,23 @@ func (m *InjectionManager) prepareGeminiEnvironment(env *ProviderEnvironment) er
 	// Create GEMINI.md for system prompt customization in workspace
 	geminiMdPath := filepath.Join(m.workspaceDir, "GEMINI.md")
 	if err := m.generateGeminiSystemPrompt(geminiMdPath); err != nil {
+		return err
+	}
+
+	// Ensure MCP servers include our slash command server
+	// This is already handled by SyncToProvider
+
+	return nil
+}
+
+// prepareQwenEnvironment prepares Qwen-specific environment
+func (m *InjectionManager) prepareQwenEnvironment(env *ProviderEnvironment) error {
+	// Since Qwen is a fork of Gemini, it has similar limitations
+	// We rely entirely on MCP servers for extensions
+
+	// Create QWEN.md for system prompt customization in workspace
+	qwenMdPath := filepath.Join(m.workspaceDir, "QWEN.md")
+	if err := m.generateQwenSystemPrompt(qwenMdPath); err != nil {
 		return err
 	}
 
@@ -367,6 +388,70 @@ This is a managed Opun session with the following MCP servers available:
 `
 
 	t, err := template.New("gemini").Parse(tmpl)
+	if err != nil {
+		return err
+	}
+
+	data := struct {
+		Commands []core.SharedSlashCommand
+		Servers  []core.SharedMCPServer
+	}{
+		Commands: m.sharedManager.GetSlashCommands(),
+		Servers:  m.sharedManager.GetMCPServers(),
+	}
+
+	file, err := os.Create(mdPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	return t.Execute(file, data)
+}
+
+// generateQwenSystemPrompt generates QWEN.md for system customization
+func (m *InjectionManager) generateQwenSystemPrompt(mdPath string) error {
+	tmpl := `# QWEN.md
+
+This file provides system-level guidance for Qwen Code CLI when working in this Opun session.
+
+## Available Commands via MCP
+
+Since Qwen doesn't support custom slash commands natively, use the MCP tools to access Opun functionality:
+
+### Workflows
+{{range .Commands}}{{if eq .Type "workflow"}}
+- **{{.Name}}**: {{.Description}}
+  - Handler: {{.Handler}}
+{{end}}{{end}}
+
+### Prompts
+{{range .Commands}}{{if eq .Type "prompt"}}
+- **{{.Name}}**: {{.Description}}
+  - Handler: {{.Handler}}
+{{end}}{{end}}
+
+### Built-in Commands
+{{range .Commands}}{{if eq .Type "builtin"}}
+- **{{.Name}}**: {{.Description}}
+{{end}}{{end}}
+
+## Using Commands
+
+To execute any of these commands, use the MCP tools:
+1. List available tools with the MCP server
+2. Execute the desired command through the opun tool
+3. For prompts, use the opun tool
+
+## Session Configuration
+
+This is a managed Opun session with the following MCP servers available:
+{{range .Servers}}{{if .Installed}}
+- **{{.Name}}**: {{.Package}}
+{{end}}{{end}}
+`
+
+	t, err := template.New("qwen").Parse(tmpl)
 	if err != nil {
 		return err
 	}

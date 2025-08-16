@@ -333,13 +333,13 @@ func (e *InteractiveExecutor) executeInteractiveAgent(ctx context.Context, agent
 			if n > 0 {
 				// Write to stdout
 				os.Stdout.Write(buf[:n])
-				
+
 				// Accumulate output for ready detection
 				promptMutex.Lock()
 				outputBuffer.Write(buf[:n])
-				
+
 				currentOutput := outputBuffer.String()
-				
+
 				// Check if we should inject prompt based on provider
 				if !promptInjected {
 					switch agent.Provider {
@@ -347,9 +347,9 @@ func (e *InteractiveExecutor) executeInteractiveAgent(ctx context.Context, agent
 						// Claude prompt detection - original logic
 						if strings.Contains(currentOutput, "│") && strings.Contains(currentOutput, ">") {
 							// More specific check - look for the prompt line pattern
-							if strings.Contains(currentOutput, "│\u00a0>") || 
-							   strings.Contains(currentOutput, "│ >") || 
-							   strings.Contains(currentOutput, "\u00a0>\u00a0") {
+							if strings.Contains(currentOutput, "│\u00a0>") ||
+								strings.Contains(currentOutput, "│ >") ||
+								strings.Contains(currentOutput, "\u00a0>\u00a0") {
 								promptInjected = true
 								// Small delay to ensure UI is ready
 								go func() {
@@ -362,13 +362,13 @@ func (e *InteractiveExecutor) executeInteractiveAgent(ctx context.Context, agent
 								}()
 							}
 						}
-					
+
 					case "gemini":
 						// Gemini prompt detection - needs ANSI stripping
 						// Strip ANSI escape sequences to check for patterns
 						ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*m`)
 						strippedOutput := ansiRegex.ReplaceAllString(currentOutput, "")
-						
+
 						// Check for the prompt pattern in stripped output
 						// The actual pattern is "│ > " with a space between pipe and arrow
 						if strings.Contains(strippedOutput, "│ > ") {
@@ -387,7 +387,7 @@ func (e *InteractiveExecutor) executeInteractiveAgent(ctx context.Context, agent
 				}
 				promptMutex.Unlock()
 			}
-			
+
 			if err != nil {
 				select {
 				case errChan <- err:

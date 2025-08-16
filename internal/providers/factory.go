@@ -42,6 +42,8 @@ func (f *ProviderFactory) CreateProvider(config core.ProviderConfig) (core.Provi
 		provider = NewClaudeProvider(config)
 	case core.ProviderTypeGemini:
 		provider = NewGeminiProvider(config)
+	case core.ProviderTypeQwen:
+		provider = NewQwenProvider(config)
 	case core.ProviderTypeMock:
 		provider = NewMockProvider(config.Name, config)
 	default:
@@ -65,6 +67,8 @@ func (f *ProviderFactory) CreateProviderFromType(providerType string, name strin
 		pType = core.ProviderTypeClaude
 	case "gemini":
 		pType = core.ProviderTypeGemini
+	case "qwen":
+		pType = core.ProviderTypeQwen
 	case "mock":
 		pType = core.ProviderTypeMock
 	default:
@@ -89,6 +93,9 @@ func (f *ProviderFactory) CreateProviderFromType(providerType string, name strin
 	case "gemini":
 		config.Command = "gemini"
 		config.Args = []string{"chat"}
+	case "qwen":
+		config.Command = "qwen"
+		config.Args = []string{"chat"}
 	}
 
 	return f.CreateProvider(config)
@@ -101,6 +108,8 @@ func getDefaultModel(providerType string) string {
 		return "sonnet"
 	case "gemini":
 		return "gemini-pro"
+	case "qwen":
+		return "code"
 	default:
 		return ""
 	}
@@ -123,6 +132,19 @@ func getDefaultFeatures(providerType string) core.ProviderFeatures {
 			ContextWindowing: true,
 		}
 	case "gemini":
+		return core.ProviderFeatures{
+			Interactive:      true,
+			Batch:            false,
+			Streaming:        true,
+			FileOutput:       false,
+			MCP:              true,
+			Tools:            true,
+			SlashCommands:    true,
+			Plugins:          true,
+			QualityModes:     false,
+			ContextWindowing: true,
+		}
+	case "qwen":
 		return core.ProviderFeatures{
 			Interactive:      true,
 			Batch:            false,

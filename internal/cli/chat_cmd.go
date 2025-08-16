@@ -13,7 +13,7 @@ func ChatCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "chat [provider] [-- additional-args...]",
 		Short: "Start an interactive chat session with an AI provider",
-		Long: `Start an interactive chat session with Claude or Gemini.
+		Long: `Start an interactive chat session with Claude, Gemini, or Qwen.
 
 If no provider is specified, uses the default provider from your configuration.
 Your promptgarden prompts and configured slash commands are available through the injection system.
@@ -24,8 +24,10 @@ Examples:
   opun chat                          # Use default provider
   opun chat claude                   # Chat with Claude
   opun chat gemini                   # Chat with Gemini
+  opun chat qwen                     # Chat with Qwen Code
   opun chat claude -- --continue     # Chat with Claude using --continue flag
   opun chat gemini -- --model=pro    # Chat with Gemini using specific model
+  opun chat qwen -- --model=code     # Chat with Qwen using specific model
   opun chat -- --continue            # Use default provider with --continue flag`,
 		Args: cobra.MinimumNArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -36,6 +38,7 @@ Examples:
 			knownProviders := map[string]bool{
 				"claude": true,
 				"gemini": true,
+				"qwen":   true,
 			}
 
 			// Parse provider and additional arguments

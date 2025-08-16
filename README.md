@@ -36,7 +36,7 @@ Download the latest binary for your platform from the [releases page](https://gi
 # If a fresh installation (configures default provider, default MCP servers, etc)
 opun setup
 
-# Initialize a chat session with the default provider -- or, specify the provider (chat {gemini,claude})
+# Initialize a chat session with the default provider -- or, specify the provider (chat {gemini,claude,qwen})
 opun chat
 
 # Add a workflow, tool or prompt -- this is interactive, no need for flags (--{prompt,workflow} --path --name)
@@ -123,7 +123,7 @@ agents:
   # First agent: Initial code analysis
   - id: analyzer                    # Unique ID for referencing this agent
     name: "Code Analyzer"           # Human-readable name displayed during execution
-    provider: claude                # AI provider: claude or gemini
+    provider: claude                # AI provider: claude, gemini, or qwen
     model: sonnet                   # Model variant (provider-specific)
     
     # The prompt is the instruction sent to the AI agent
@@ -446,6 +446,7 @@ command: "rg --type-add 'code:*.{js,ts,go,py,java,rs,cpp,c,h}' -t code"
 providers:
   - claude
   - gemini
+  - qwen
 
 ---
 
@@ -601,6 +602,7 @@ export MAX_FILE_SIZE="1000000"
 # Provider-specific settings
 export CLAUDE_MODEL="sonnet"
 export GEMINI_TEMPERATURE="0.7"
+export QWEN_MODEL="code"
 ```
 
 **Using in Configurations**:
