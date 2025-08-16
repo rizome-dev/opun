@@ -497,66 +497,66 @@ func handleInteractiveWorkflowEdit(item *updateItem) error {
 	if err != nil {
 		return err
 	}
-	
+
 	workflowsDir := filepath.Join(home, ".opun", "workflows")
 	workflowPath := filepath.Join(workflowsDir, item.name+".yaml")
-	
+
 	// Read existing workflow
 	data, err := os.ReadFile(workflowPath)
 	if err != nil {
 		return fmt.Errorf("failed to read workflow file: %w", err)
 	}
-	
+
 	var workflow map[string]interface{}
 	if err := yaml.Unmarshal(data, &workflow); err != nil {
 		return fmt.Errorf("failed to unmarshal workflow yaml: %w", err)
 	}
-	
+
 	// Edit basic info
 	name, err := PromptWithDefault("Enter a new name for the workflow:", getStringField(workflow, "name"))
 	if err != nil {
 		return err
 	}
-	
+
 	description, err := PromptWithDefault("Enter a new description for the workflow:", getStringField(workflow, "description"))
 	if err != nil {
 		return err
 	}
-	
+
 	command, err := PromptWithDefault("Enter a new command name:", getStringField(workflow, "command"))
 	if err != nil {
 		return err
 	}
-	
+
 	// Update workflow
 	workflow["name"] = name
 	workflow["description"] = description
 	workflow["command"] = command
-	
+
 	// Ask if user wants to edit agents
 	editAgents, err := Confirm("Do you want to edit the agents in this workflow?")
 	if err != nil {
 		return err
 	}
-	
+
 	if editAgents {
 		// This would be complex to implement fully - for now just show info
 		fmt.Println("Agent editing in interactive mode is not yet fully implemented.")
 		fmt.Println("For now, you can update the workflow file directly or use the file replacement option.")
 	}
-	
+
 	newData, err := yaml.Marshal(workflow)
 	if err != nil {
 		return fmt.Errorf("failed to marshal workflow to yaml: %w", err)
 	}
-	
+
 	// Save updated workflow
 	if err := os.WriteFile(workflowPath, newData, 0644); err != nil {
 		return fmt.Errorf("failed to save workflow: %w", err)
 	}
-	
+
 	fmt.Printf("✓ Updated workflow '%s'\n", name)
-	
+
 	return nil
 }
 
@@ -998,4 +998,3 @@ func PromptWithDefault(prompt, defaultValue string) (string, error) {
 	}
 	return input, nil
 }
-

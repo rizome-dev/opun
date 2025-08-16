@@ -50,7 +50,7 @@ func (p *GeminiPTYProvider) StartSession(ctx context.Context, workingDir string)
 			fmt.Fprintf(os.Stderr, "[GEMINI DEBUG] Raw output: %q\n", string(data))
 		},
 	}
-	
+
 	fmt.Fprintf(os.Stderr, "[GEMINI DEBUG] Starting session with command: %s %v\n", config.Command, config.Args)
 
 	session, err := pty.NewSession(config)
