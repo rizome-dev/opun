@@ -36,7 +36,7 @@ func RootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "opun",
 		Short: "AI code agent automation framework",
-		Long: `Opun automates interaction with AI code agents (Claude Code and Gemini CLI)
+		Long: `Opun automates interaction with AI code agents (Claude Code, Gemini CLI, and Qwen Code)
 by managing their interactive sessions and providing workflow orchestration.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return initConfig(configFile)
@@ -157,7 +157,7 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.
 
 // GetCustomHelp returns the formatted help text for display
 func GetCustomHelp() string {
-	return `Opun automates interaction with AI code agents (Claude Code and Gemini CLI)
+	return `Opun automates interaction with AI code agents (Claude Code, Gemini CLI, and Qwen Code)
 by managing their interactive sessions and providing workflow orchestration.
 
 Usage:
