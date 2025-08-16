@@ -9,6 +9,16 @@ Pull requests are the best way to propose changes to the codebase. Before you do
 3. Run `make test` & `make build` to ensure they pass.
 4. Wait for CI tests to pass (for now, Lint & Security are not required, but we will be reviewing the pipeline to ensure you haven't added any HIGH vuln security issues - if so, your PR will be rejected, so I highly reccomend carefully reading the results of the Security CI step).
 
+### Contributing to Subagents
+
+When adding or modifying subagent functionality:
+
+1. **Add example configurations**: Place example subagent configs in `examples/subagents/`
+2. **Test cross-provider interactions**: Ensure your changes work with Claude, Gemini, and Qwen
+3. **Document capabilities**: Clearly define what capabilities your subagent provides
+4. **Include workflow examples**: Show how your subagent can be used in workflows
+5. **Test with MCP servers**: If your subagent uses MCP tools, include integration tests
+
 ### Development Environment Basics
 
 Setup a new environment:

@@ -1,0 +1,216 @@
+# Comprehensive Cross-Provider Analysis Workflow
+# 
+# This workflow demonstrates the power of cross-provider subagent orchestration
+# by leveraging the unique strengths of each AI provider:
+# - Gemini: Research and broad knowledge gathering
+# - Claude: Deep reasoning and code analysis
+# - Qwen: Code generation and refactoring
+#
+# Usage:
+#   opun run comprehensive-analysis --file_path ./src/main.go
+#
+name: comprehensive-analysis
+version: 1.0.0
+description: Multi-provider comprehensive code analysis with specialized subagents
+author: Opun Team
+
+# Workflow variables that users can provide
+variables:
+  - name: file_path
+    description: Path to the file to analyze
+    type: string
+    required: true
+  
+  - name: analysis_depth
+    description: Depth of analysis (quick, standard, thorough)
+    type: string
+    required: false
+    default: standard
+    enum: ["quick", "standard", "thorough"]
+  
+  - name: output_format
+    description: Format for the final report
+    type: string
+    required: false
+    default: markdown
+    enum: ["markdown", "json", "html"]
+
+# Global settings for the workflow
+settings:
+  output_dir: "./analysis-outputs/{{timestamp}}"
+  stop_on_error: false
+  parallel_execution: true  # Enable parallel execution where possible
+
+# Agent definitions using subagents
+agents:
+  # Phase 1: Initial Research (Gemini's strength)
+  - id: researcher
+    name: "Code Context Researcher"
+    subagent: gemini-researcher
+    prompt: |
+      Research the following aspects of {{file_path}}:
+      1. Identify the programming language and framework
+      2. Research best practices for this technology stack
+      3. Find common patterns and anti-patterns
+      4. Search for recent security vulnerabilities
+      
+      Analysis depth: {{analysis_depth}}
+      
+      Save your research findings to the output file.
+    output: research-findings.md
+    settings:
+      timeout: 120
+      mcp_servers: ["web-tools"]
+      tools: ["web-search"]
+    
+  # Phase 2: Parallel Deep Analysis
+  # These two agents run in parallel since they don't depend on each other
+  
+  - id: code-analyzer
+    name: "Deep Code Analyzer"
+    subagent: claude-analyzer
+    depends_on: [researcher]
+    prompt: |
+      Based on the research context:
+      {{researcher.output}}
+      
+      Perform a deep analysis of {{file_path}}:
+      1. Code architecture and design patterns
+      2. Complexity analysis and metrics
+      3. Dependency analysis
+      4. Performance bottlenecks
+      5. Code smells and technical debt
+      
+      Use the research findings to inform your analysis.
+      Save detailed findings to the output file.
+    output: code-analysis.md
+    settings:
+      quality_mode: deep-think
+      temperature: 0.2
+      timeout: 180
+    
+  - id: security-auditor
+    name: "Security Auditor"
+    subagent: claude-security
+    depends_on: [researcher]
+    prompt: |
+      Given the research on vulnerabilities:
+      {{researcher.output}}
+      
+      Conduct a comprehensive security audit of {{file_path}}:
+      1. Check for OWASP Top 10 vulnerabilities
+      2. Identify injection risks
+      3. Review authentication/authorization
+      4. Assess data validation
+      5. Check for hardcoded secrets
+      6. Review error handling
+      
+      Provide severity ratings for each finding.
+      Save the security report to the output file.
+    output: security-audit.md
+    settings:
+      temperature: 0.1  # Very focused for security
+      mcp_servers: ["sequential-thinking"]
+    
+  # Phase 3: Solution Generation (Qwen's strength)
+  - id: refactorer
+    name: "Refactoring Specialist"
+    subagent: qwen-refactorer
+    depends_on: [code-analyzer, security-auditor]
+    prompt: |
+      Based on the analysis and security findings:
+      - Code Analysis: {{code-analyzer.output}}
+      - Security Audit: {{security-auditor.output}}
+      
+      Generate refactoring suggestions for {{file_path}}:
+      1. Create improved code snippets addressing issues
+      2. Suggest architectural improvements
+      3. Provide security fixes with code examples
+      4. Optimize performance-critical sections
+      5. Modernize deprecated patterns
+      
+      Include before/after code comparisons.
+      Save all suggestions to the output file.
+    output: refactoring-suggestions.md
+    settings:
+      temperature: 0.7  # More creative for code generation
+      max_tokens: 8000
+    
+  # Phase 4: Testing Strategy
+  - id: test-strategist
+    name: "Test Strategy Designer"
+    subagent: gemini-tester
+    depends_on: [code-analyzer, security-auditor]
+    prompt: |
+      Based on the code analysis and security findings:
+      - Code Analysis: {{code-analyzer.output}}
+      - Security Audit: {{security-auditor.output}}
+      
+      Design a comprehensive testing strategy for {{file_path}}:
+      1. Unit test scenarios
+      2. Integration test cases
+      3. Security test cases
+      4. Performance benchmarks
+      5. Edge cases and error conditions
+      
+      Provide example test code where appropriate.
+      Save the test strategy to the output file.
+    output: test-strategy.md
+    settings:
+      timeout: 120
+    
+  # Phase 5: Final Report Consolidation
+  - id: report-generator
+    name: "Report Generator"
+    subagent: claude-reporter
+    depends_on: [refactorer, test-strategist]
+    prompt: |
+      Consolidate all analysis into a comprehensive report.
+      
+      Read and synthesize:
+      - Research: {{researcher.output}}
+      - Code Analysis: {{code-analyzer.output}}
+      - Security Audit: {{security-auditor.output}}
+      - Refactoring: {{refactorer.output}}
+      - Test Strategy: {{test-strategist.output}}
+      
+      Create a {{output_format}} report with:
+      1. Executive Summary
+      2. Key Findings (prioritized by severity)
+      3. Immediate Action Items
+      4. Long-term Recommendations
+      5. Implementation Roadmap
+      
+      Focus on actionable insights and clear next steps.
+      Save the final report to the output file.
+    output: final-report.{{output_format}}
+    settings:
+      quality_mode: deep-think
+      temperature: 0.3
+      interactive: true  # Allow user questions during consolidation
+    
+    # Post-processing actions
+    on_success:
+      - type: log
+        message: "Comprehensive analysis completed successfully!"
+      - type: execute
+        data:
+          command: "echo 'Report saved to {{output_dir}}/final-report.{{output_format}}'"
+
+# Workflow metadata
+metadata:
+  tags: ["analysis", "security", "refactoring", "cross-provider"]
+  estimated_duration: "10-15 minutes"
+  requirements:
+    - "File must exist at specified path"
+    - "All subagents must be configured"
+    - "Sufficient provider quotas"
+  
+  # Subagent requirements (these should be created before running)
+  required_subagents:
+    - gemini-researcher
+    - claude-analyzer
+    - claude-security
+    - qwen-refactorer
+    - gemini-tester
+    - claude-reporter

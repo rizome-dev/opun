@@ -8,6 +8,7 @@ This directory contains simple, clear examples of each Opun component type.
 examples/
 ├── prompt/          # Prompt templates for AI agents
 ├── workflow/        # Multi-agent orchestration workflows
+├── subagents/       # Cross-provider subagent configurations
 ├── action/          # Commands that AI agents can execute
 ├── tool/            # MCP tools for Opun's MCP server
 └── manifest/        # Example manifest for remote distribution
@@ -63,7 +64,31 @@ opun add
 # Choose: Local → Action → Select file
 ```
 
-### 4. Tool Example (`tool/`)
+### 4. Subagent Example (`subagents/`)
+
+**Files**: 
+- `claude-reviewer.yaml` - Claude-based code review specialist
+- `gemini-analyzer.yaml` - Gemini-based architecture analyzer
+- `qwen-refactorer.yaml` - Qwen-based code refactoring expert
+- `cross-provider-workflow.yaml` - Workflow using multiple subagents
+
+These examples demonstrate:
+- Provider-specific configurations
+- Capability definitions
+- System prompts for specialization
+- Cross-provider orchestration in workflows
+
+To create a subagent:
+```bash
+opun subagent create examples/subagents/claude-reviewer.yaml
+```
+
+To use in a workflow:
+```bash
+opun run examples/subagents/cross-provider-workflow.yaml
+```
+
+### 5. Tool Example (`tool/`)
 
 **File**: `calculator.yaml` - Basic arithmetic calculations for MCP
 
@@ -139,6 +164,18 @@ opun prompt code-review --file-path main.go
 opun run test-and-fix
 ```
 
+**Subagents:**
+```bash
+# List available subagents
+opun subagent list
+
+# Execute task with specific subagent
+opun subagent execute claude-reviewer "Review this code: func main() {...}"
+
+# Get subagent information
+opun subagent info claude-reviewer
+```
+
 **Actions (in chat):**
 ```bash
 opun chat
@@ -154,6 +191,7 @@ Tools are automatically available to AI agents through the MCP protocol.
 
 - **Prompts**: Reusable templates with variables and logic
 - **Workflows**: Multi-agent orchestration with dependencies
+- **Subagents**: Specialized AI agents for cross-provider delegation
 - **Actions**: Simple commands that agents can execute
 - **Tools**: MCP-compatible tools for advanced agent capabilities
 
@@ -168,6 +206,7 @@ Tools are automatically available to AI agents through the MCP protocol.
 ~/.opun/
 ├── promptgarden/    # Prompts
 ├── workflows/       # Workflows
+├── subagents/       # Subagent configurations
 ├── actions/         # Actions
 ├── mcp/
 │   └── tools/      # MCP Tools
@@ -206,6 +245,20 @@ imports:
         - name: step1
           prompt: "First step"
           provider: claude
+        - name: step2
+          subagent: code-reviewer  # Using a subagent
+          prompt: "Review the output"
+  
+  subagents:
+    - name: my-specialist
+      provider: gemini
+      model: gemini-pro
+      capabilities:
+        - analysis
+        - research
+      description: "Specialized research agent"
+      system_prompt: |
+        You are a research specialist...
   
   actions:
     - name: my-action

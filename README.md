@@ -4,7 +4,7 @@ At Rizome Labs, we are using CLI Code Agents (TDEs) a LOT. Therefore, we wanted 
 
 Thus, Opun was born.
 
-Opun is a Terminal Development Kit - a wrapper for Terminal Development Environments (TDEs), providing Sequential Workflow Automation, a standardized configuration system for Prompts, Workflows, Actions & Tools, remote distribution via manifests, MCP Client & Server, Slash Commands, a Prompt Garden, and much more.
+Opun is a Terminal Development Kit - a wrapper for Terminal Development Environments (TDEs), providing Sequential Workflow Automation, Cross-Provider Subagent Orchestration, a standardized configuration system for Prompts, Workflows, Actions & Tools, remote distribution via manifests, MCP Client & Server, Slash Commands, a Prompt Garden, and much more.
 
 built by: [rizome labs](https://rizome.dev)
 
@@ -47,28 +47,193 @@ opun run
 
 # Manipulate the registry
 opun {update,delete}
+
+# Subagent management - orchestrate across providers
+opun subagent list                          # List all registered subagents
+opun subagent create config.yaml            # Create from configuration
+opun subagent execute agent-name "task"     # Execute task on specific agent
+opun subagent info agent-name               # Show agent details
 ```
 
 ## Configuration
 
-Opun's configuration system is designed to be modular, declarative, and human-readable. Each type of configuration serves a specific purpose in the ecosystem, allowing you to build complex automation workflows while maintaining simplicity and reusability.
+### Cross-Provider Subagents (`~/.opun/subagents/*.yaml`)
 
-### Configuration Overview
+**Purpose**: Subagents enable intelligent task delegation across different AI providers (Claude, Gemini, Qwen), allowing you to leverage each provider's unique strengths. This creates a powerful multi-agent system where specialized agents collaborate to solve complex problems.
 
-All configuration files are stored in `~/.opun/` and organized by type:
+**Key Concepts**:
+- **Provider Specialization**: Assign specific providers to tasks they excel at
+- **Capability-Based Routing**: Tasks are automatically routed to agents with matching capabilities
+- **Cross-Provider Orchestration**: Seamlessly coordinate between Claude, Gemini, and Qwen
+- **Workflow Integration**: Use subagents directly in workflow definitions
+- **MCP Task Server**: Integration with Model Context Protocol for advanced tool usage
 
+**Structure**:
+
+```yaml
+# Subagent Configuration
+name: code-reviewer               # Unique identifier
+provider: claude                  # Provider: claude, gemini, or qwen
+model: claude-3-sonnet            # Model variant
+type: specialist                  # Agent type: specialist, generalist, coordinator
+description: Expert code review agent specialized in security and best practices
+
+# Capabilities define what this agent can do
+capabilities:
+  - code-review                  # Review code for quality and issues
+  - security-analysis             # Identify security vulnerabilities
+  - performance-optimization      # Suggest performance improvements
+  - best-practices               # Ensure adherence to standards
+
+# Provider-specific settings
+settings:
+  temperature: 0.3                # Lower for more focused analysis
+  max_tokens: 4000
+  quality_mode: thorough          # deep-think, thorough, or quick
+  timeout: 120                    # Seconds before timeout
+
+# Tools available to this agent
+tools:
+  - read_file
+  - write_file
+  - search_code
+  - analyze_security
+
+# MCP servers for extended capabilities
+mcp_servers:
+  - sequential-thinking           # For complex reasoning
+  - web-tools                     # For web search and research
+
+# System prompt defines the agent's behavior
+system_prompt: |
+  You are an expert code reviewer with 15+ years of experience.
+  Focus on:
+  - Security vulnerabilities (OWASP Top 10)
+  - Performance bottlenecks
+  - Code maintainability
+  - Best practices and design patterns
+  
+  Always provide actionable suggestions with code examples.
 ```
-~/.opun/
-├── config.yaml            # Main configuration
-├── workflows/            # Multi-agent workflow definitions
-├── promptgarden/         # Reusable prompt templates
-├── actions/              # Simple command shortcuts
-├── tools/                # Provider-specific tools
-├── mcp/                  # MCP server configurations
-│   ├── servers/         # MCP server definitions
-│   └── tools/           # MCP tool definitions
-└── plugins/              # Installed plugins
+
+**Creating Subagents**:
+
+```bash
+# From configuration file
+opun subagent create examples/subagents/code-reviewer.yaml
+
+# Using command-line flags
+opun subagent create \
+  --name security-auditor \
+  --provider gemini \
+  --model gemini-pro \
+  --capabilities "security-analysis,vulnerability-detection" \
+  --description "Security-focused auditor"
+
+# Interactive creation
+opun subagent create
+# You'll be prompted for all configuration options
 ```
+
+**Using Subagents**:
+
+```bash
+# Direct execution
+opun subagent execute code-reviewer "Review this function for security issues: ..."
+
+# With context and options
+opun subagent execute analyzer "Analyze architecture" \
+  --context project=backend,language=go \
+  --timeout 180 \
+  --output analysis.md
+
+# List available subagents
+opun subagent list
+
+# Get detailed information
+opun subagent info code-reviewer
+
+# Delete a subagent
+opun subagent delete old-agent
+```
+
+**Workflow Integration**:
+
+Subagents can be seamlessly integrated into workflows for complex multi-step operations:
+
+```yaml
+# Cross-provider workflow example
+name: comprehensive-code-analysis
+description: Multi-provider code analysis workflow
+
+agents:
+  # Gemini for initial analysis (good at understanding structure)
+  - id: analyzer
+    name: "Code Analyzer"
+    subagent: gemini-analyzer        # Use specific subagent
+    prompt: |
+      Analyze the code structure and architecture of {{file_path}}.
+      Focus on design patterns, modularity, and dependencies.
+    output: structure-analysis.md
+    
+  # Claude for security review (excellent at finding vulnerabilities)
+  - id: security
+    name: "Security Reviewer"
+    subagent: claude-security         # Different provider
+    depends_on: [analyzer]
+    prompt: |
+      Based on the analysis: {{analyzer.output}}
+      
+      Perform a comprehensive security audit of {{file_path}}.
+      Identify vulnerabilities and suggest fixes.
+    output: security-report.md
+    
+  # Qwen for refactoring suggestions (strong at code generation)
+  - id: refactor
+    name: "Refactoring Expert"
+    subagent: qwen-refactorer
+    depends_on: [analyzer, security]
+    prompt: |
+      Given the structure analysis and security findings:
+      - Structure: {{analyzer.output}}
+      - Security: {{security.output}}
+      
+      Suggest refactoring improvements for {{file_path}}.
+    output: refactoring-suggestions.md
+```
+
+**Delegation Strategies**:
+
+1. **Automatic**: System selects the best agent based on capabilities
+   ```yaml
+   strategy: automatic
+   # Task requirements are matched against agent capabilities
+   ```
+
+2. **Explicit**: Directly specify which agent to use
+   ```yaml
+   strategy: explicit
+   subagent: claude-reviewer
+   ```
+
+3. **Proactive**: Agents volunteer for tasks matching their patterns
+   ```yaml
+   strategy: proactive
+   patterns:
+     - "*security*"
+     - "*vulnerability*"
+   ```
+
+**Best Practices**:
+
+- **Provider Selection**: Choose providers based on their strengths:
+  - Claude: Complex reasoning, detailed analysis, code review
+  - Gemini: Research, web search, broad knowledge
+  - Qwen: Code generation, refactoring, technical documentation
+- **Capability Design**: Keep capabilities specific and measurable
+- **Context Preservation**: Use workflow variables to maintain context
+- **Error Handling**: Configure fallback agents for critical tasks
+- **Performance**: Use parallel execution for independent subagents
 
 ### Workflows (`~/.opun/workflows/*.yaml`)
 

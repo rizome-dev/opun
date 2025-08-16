@@ -109,6 +109,11 @@ Simply type opun help [path to command] for full details.`,
 		capabilityCmd,
 	)
 
+	// Add SubAgent command
+	rootCmd.AddCommand(
+		SubAgentCmd(),
+	)
+
 	// Add System commands (internal operations)
 	rootCmd.AddCommand(
 		SetupCmd(),
@@ -136,6 +141,7 @@ Main Commands:
   chat        Start an interactive chat session
   run         Run a workflow
   refactor    Refactor code files
+  subagent    Manage cross-provider subagents
 
 Capability Commands:
   capability  List and search all Opun capabilities
