@@ -216,6 +216,8 @@ func (m *SharedConfigManager) SyncToProvider(providerName string) error {
 		translator = NewClaudeConfigTranslator()
 	case "gemini":
 		translator = NewGeminiConfigTranslator()
+	case "qwen":
+		translator = NewQwenConfigTranslator()
 	default:
 		return fmt.Errorf("unsupported provider: %s", providerName)
 	}
@@ -248,10 +250,39 @@ func (m *SharedConfigManager) writeProviderConfig(translator core.ProviderConfig
 		configPath = filepath.Join(homeDir, configPath[2:])
 	}
 
-	// Marshal config
-	data, err := json.MarshalIndent(config, "", "  ")
+	// Read existing config if it exists
+	var existingConfig map[string]interface{}
+	if existingData, err := os.ReadFile(configPath); err == nil {
+		// Parse existing config
+		if err := json.Unmarshal(existingData, &existingConfig); err != nil {
+			// If we can't parse it, start fresh
+			existingConfig = make(map[string]interface{})
+		}
+	} else {
+		// No existing config, start fresh
+		existingConfig = make(map[string]interface{})
+	}
+
+	// Convert new config to map for merging
+	newConfigData, err := json.Marshal(config)
 	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
+		return fmt.Errorf("failed to marshal new config: %w", err)
+	}
+	
+	var newConfig map[string]interface{}
+	if err := json.Unmarshal(newConfigData, &newConfig); err != nil {
+		return fmt.Errorf("failed to unmarshal new config: %w", err)
+	}
+
+	// Merge new config into existing config (preserving existing fields)
+	for key, value := range newConfig {
+		existingConfig[key] = value
+	}
+
+	// Marshal merged config
+	data, err := json.MarshalIndent(existingConfig, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal merged config: %w", err)
 	}
 
 	// Use utils.WriteFile which handles directory creation and permissions

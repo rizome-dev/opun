@@ -44,7 +44,7 @@ func NewAutomator(session *Session) *Automator {
 // SendPromptWithCopy sends a prompt using copy/paste method
 func (a *Automator) SendPromptWithCopy(ctx context.Context, prompt string) error {
 	fmt.Fprintf(os.Stderr, "[AUTOMATOR DEBUG] SendPromptWithCopy called with prompt length: %d\n", len(prompt))
-	
+
 	// Copy prompt to clipboard
 	if err := a.clipboard.Copy(prompt); err != nil {
 		return fmt.Errorf("failed to copy to clipboard: %w", err)

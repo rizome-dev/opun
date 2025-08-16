@@ -44,6 +44,12 @@ func (d *Detector) DetectCommand(provider string) (string, error) {
 		}
 		return "", fmt.Errorf("gemini command not found, please install Gemini CLI")
 
+	case "qwen":
+		if _, err := exec.LookPath("qwen"); err == nil {
+			return "qwen", nil
+		}
+		return "", fmt.Errorf("qwen command not found, please install Qwen Code CLI")
+
 	default:
 		return "", fmt.Errorf("unsupported provider: %s", provider)
 	}

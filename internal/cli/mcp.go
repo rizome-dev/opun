@@ -130,6 +130,8 @@ To use with Gemini, add this to ~/.gemini/settings.json:
   }
 }`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Set environment variable to suppress warnings that could interfere with JSON-RPC
+			os.Setenv("OPUN_MCP_STDIO", "1")
 			// Initialize components
 			home, err := os.UserHomeDir()
 			if err != nil {
@@ -140,8 +142,8 @@ To use with Gemini, add this to ~/.gemini/settings.json:
 			gardenPath := filepath.Join(home, ".opun", "promptgarden")
 			garden, err := promptgarden.NewGarden(gardenPath)
 			if err != nil {
-				// Log to stderr since stdout is used for MCP protocol
-				fmt.Fprintf(os.Stderr, "Warning: failed to initialize prompt garden: %v\n", err)
+				// Suppress warnings in stdio mode - they interfere with JSON-RPC protocol
+				// fmt.Fprintf(os.Stderr, "Warning: failed to initialize prompt garden: %v\n", err)
 			}
 
 			// Initialize command registry
@@ -155,16 +157,16 @@ To use with Gemini, add this to ~/.gemini/settings.json:
 			workflowPath := filepath.Join(home, ".opun", "workflows")
 			workflowMgr, err := workflow.NewManager(workflowPath)
 			if err != nil {
-				// Log to stderr
-				fmt.Fprintf(os.Stderr, "Warning: failed to initialize workflow manager: %v\n", err)
+				// Suppress warnings in stdio mode - they interfere with JSON-RPC protocol
+				// fmt.Fprintf(os.Stderr, "Warning: failed to initialize workflow manager: %v\n", err)
 			}
 
 			// Initialize tool registry
 			toolsPath := filepath.Join(home, ".opun", "tools")
 			toolLoader := tools.NewLoader(toolsPath)
 			if err := toolLoader.LoadAll(); err != nil {
-				// Log to stderr
-				fmt.Fprintf(os.Stderr, "Warning: failed to load tools: %v\n", err)
+				// Suppress warnings in stdio mode - they interfere with JSON-RPC protocol
+				// fmt.Fprintf(os.Stderr, "Warning: failed to load tools: %v\n", err)
 			}
 			toolRegistry := toolLoader.GetRegistry()
 

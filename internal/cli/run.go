@@ -110,7 +110,7 @@ func runWorkflow(name string, vars map[string]string) error {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(sigChan)
-	
+
 	// Track if we're handling a signal
 	signalHandled := make(chan struct{})
 	go func() {
@@ -122,12 +122,12 @@ func runWorkflow(name string, vars map[string]string) error {
 
 	// Execute workflow
 	execErr := executor.Execute(ctx, wf, variables)
-	
+
 	// Always ensure terminal is restored, whether we succeeded or failed
 	if term.IsTerminal(int(os.Stdin.Fd())) {
 		_ = exec.Command("stty", "sane").Run()
 	}
-	
+
 	// Check if we were interrupted
 	select {
 	case <-signalHandled:
@@ -137,7 +137,7 @@ func runWorkflow(name string, vars map[string]string) error {
 	default:
 		// Normal completion or error
 	}
-	
+
 	if execErr != nil {
 		return fmt.Errorf("workflow execution failed: %w", execErr)
 	}

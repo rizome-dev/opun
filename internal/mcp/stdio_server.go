@@ -66,14 +66,13 @@ func NewStdioMCPServer(garden *promptgarden.Garden, registry *command.Registry, 
 
 // Run starts the stdio MCP server
 func (s *StdioMCPServer) Run(ctx context.Context) error {
-	// Log server start
-	fmt.Fprintf(os.Stderr, "Opun MCP server started (stdio mode)\n")
+	// Don't log server start - some clients may capture stderr
 
 	// Main message loop - wait for requests
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Fprintf(os.Stderr, "MCP server shutting down: %v\n", ctx.Err())
+			// Don't log to stderr - it might interfere with the protocol
 			return ctx.Err()
 		default:
 			// Blocking read - this is the standard MCP approach
@@ -81,11 +80,14 @@ func (s *StdioMCPServer) Run(ctx context.Context) error {
 			if err != nil {
 				if err == io.EOF {
 					// EOF is normal when client disconnects
-					fmt.Fprintf(os.Stderr, "MCP client disconnected (EOF)\n")
+					// Don't log to stderr - it might interfere with the protocol
 					return nil
 				}
-				// Log other errors to stderr
-				fmt.Fprintf(os.Stderr, "Error reading request: %v\n", err)
+				// Don't log parse errors - they're already handled with proper JSON-RPC response
+				if !strings.Contains(err.Error(), "invalid JSON") {
+					// Don't log other errors to stderr either - it might interfere
+					// fmt.Fprintf(os.Stderr, "Error reading request: %v\n", err)
+				}
 				continue
 			}
 
@@ -102,8 +104,22 @@ func (s *StdioMCPServer) readRequest() (map[string]interface{}, error) {
 		return nil, err
 	}
 
+	// Skip empty lines
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return nil, io.EOF
+	}
+
+
 	var request map[string]interface{}
 	if err := json.Unmarshal([]byte(line), &request); err != nil {
+		// Don't send parse error for empty JSON objects or arrays
+		// Qwen might send these as initial probes
+		if line == "{}" || line == "[]" || line == "null" {
+			return nil, io.EOF
+		}
+		// Send proper JSON-RPC error response for parse errors
+		s.sendParseError()
 		return nil, fmt.Errorf("invalid JSON: %w", err)
 	}
 
@@ -112,6 +128,11 @@ func (s *StdioMCPServer) readRequest() (map[string]interface{}, error) {
 
 // sendResponse sends a JSON-RPC response to stdout
 func (s *StdioMCPServer) sendResponse(id interface{}, result interface{}) {
+	// Don't send responses for notifications (no id)
+	if id == nil {
+		return
+	}
+	
 	response := map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      id,
@@ -119,6 +140,8 @@ func (s *StdioMCPServer) sendResponse(id interface{}, result interface{}) {
 	}
 
 	data, _ := json.Marshal(response)
+	
+	
 	fmt.Fprintf(s.writer, "%s\n", data)
 	// Ensure output is flushed immediately
 	if f, ok := s.writer.(*os.File); ok {
@@ -128,12 +151,39 @@ func (s *StdioMCPServer) sendResponse(id interface{}, result interface{}) {
 
 // sendError sends a JSON-RPC error response
 func (s *StdioMCPServer) sendError(id interface{}, err error) {
+	// Don't send error responses for notifications (no id)
+	if id == nil {
+		return
+	}
+	
 	response := map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      id,
 		"error": map[string]interface{}{
 			"code":    -32603,
 			"message": err.Error(),
+		},
+	}
+
+	data, _ := json.Marshal(response)
+	
+	
+	fmt.Fprintf(s.writer, "%s\n", data)
+	// Ensure output is flushed immediately
+	if f, ok := s.writer.(*os.File); ok {
+		f.Sync()
+	}
+}
+
+// sendParseError sends a JSON-RPC parse error (for malformed JSON)
+func (s *StdioMCPServer) sendParseError() {
+	// According to JSON-RPC 2.0 spec, parse errors should have id: null
+	response := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      nil,
+		"error": map[string]interface{}{
+			"code":    -32700,
+			"message": "Parse error",
 		},
 	}
 
@@ -151,26 +201,44 @@ func (s *StdioMCPServer) handleRequest(request map[string]interface{}) {
 	id := request["id"]
 	params, _ := request["params"].(map[string]interface{})
 
+
+	// If there's no id, this is a notification and we shouldn't respond
+	isNotification := id == nil
+
 	// Only log errors and important events to stderr
 
 	switch method {
 	case "initialize":
-		s.handleInitialize(id, params)
+		if !isNotification {
+			s.handleInitialize(id, params)
+		}
 	case "tools/list":
-		s.handleToolsList(id)
+		if !isNotification {
+			s.handleToolsList(id)
+		}
 	case "tools/call":
-		s.handleToolCall(id, params)
+		if !isNotification {
+			s.handleToolCall(id, params)
+		}
 	case "prompts/list":
-		s.handlePromptsList(id)
+		if !isNotification {
+			s.handlePromptsList(id)
+		}
 	case "prompts/get":
-		s.handlePromptsGet(id, params)
+		if !isNotification {
+			s.handlePromptsGet(id, params)
+		}
 	case "ping":
 		// Handle ping to keep connection alive
-		s.sendResponse(id, map[string]interface{}{
-			"status": "ok",
-		})
+		if !isNotification {
+			s.sendResponse(id, map[string]interface{}{
+				"status": "ok",
+			})
+		}
 	default:
-		s.sendError(id, fmt.Errorf("unknown method: %s", method))
+		if !isNotification {
+			s.sendError(id, fmt.Errorf("unknown method: %s", method))
+		}
 	}
 }
 

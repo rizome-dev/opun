@@ -87,6 +87,8 @@ func runChat(cmd *cobra.Command, provider string, providerArgs []string) error {
 		command = "claude"
 	case "gemini":
 		command = "gemini"
+	case "qwen":
+		command = "qwen"
 	default:
 		return fmt.Errorf("unsupported provider: %s", provider)
 	}
