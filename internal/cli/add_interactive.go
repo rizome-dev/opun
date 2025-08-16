@@ -52,8 +52,8 @@ const (
 
 // Step 1: Choose add method (Interactive or From File)
 type addMethodChoice struct {
-	title       string
-	description string
+	title         string
+	description   string
 	isInteractive bool
 }
 
@@ -84,30 +84,30 @@ func (i itemChoice) Description() string { return i.description }
 
 // Main interactive add model
 type interactiveAddModel struct {
-	step         string // "method", "source", "type", "path", "done"
+	step          string // "method", "source", "type", "path", "done"
 	isInteractive bool
-	source       sourceType
-	itemType     itemType
-	path         string
-	url          string
-	list         list.Model
-	methodChoice *addMethodChoice
-	sourceChoice *sourceChoice
-	itemChoice   *itemChoice
-	err          error
+	source        sourceType
+	itemType      itemType
+	path          string
+	url           string
+	list          list.Model
+	methodChoice  *addMethodChoice
+	sourceChoice  *sourceChoice
+	itemChoice    *itemChoice
+	err           error
 }
 
 func initialInteractiveAddModel() interactiveAddModel {
 	// Start with method selection
 	methods := []list.Item{
 		addMethodChoice{
-			title:       "Create interactively",
-			description: "Create a new configuration interactively",
+			title:         "Create interactively",
+			description:   "Create a new configuration interactively",
 			isInteractive: true,
 		},
 		addMethodChoice{
-			title:       "From a file",
-			description: "Add from a local or remote file",
+			title:         "From a file",
+			description:   "Add from a local or remote file",
 			isInteractive: false,
 		},
 	}
@@ -303,44 +303,44 @@ func handleInteractiveCreate(itemType itemType) error {
 
 func handleInteractiveWorkflowCreate() error {
 	fmt.Println("Creating a new workflow interactively...")
-	
+
 	// Step 1: Basic workflow info
 	name, err := Prompt("Enter workflow name:")
 	if err != nil {
 		return err
 	}
-	
+
 	description, err := Prompt("Enter workflow description:")
 	if err != nil {
 		return err
 	}
-	
+
 	command, err := Prompt("Enter command name (for /command usage):")
 	if err != nil {
 		return err
 	}
-	
+
 	// Step 2: Create first agent
 	fmt.Println("\nCreating the first agent...")
 	agents := []map[string]interface{}{}
-	
+
 	agent, err := createInteractiveAgent("agent1")
 	if err != nil {
 		return err
 	}
 	agents = append(agents, agent)
-	
+
 	// Step 3: Ask for additional agents
 	for {
 		addMore, err := Confirm("Do you want to add another agent?")
 		if err != nil {
 			return err
 		}
-		
+
 		if !addMore {
 			break
 		}
-		
+
 		agentID := fmt.Sprintf("agent%d", len(agents)+1)
 		agent, err := createInteractiveAgent(agentID)
 		if err != nil {
@@ -348,7 +348,7 @@ func handleInteractiveWorkflowCreate() error {
 		}
 		agents = append(agents, agent)
 	}
-	
+
 	// Step 4: Create workflow structure
 	workflow := map[string]interface{}{
 		"name":        name,
@@ -360,34 +360,34 @@ func handleInteractiveWorkflowCreate() error {
 			"stop_on_error": true,
 		},
 	}
-	
+
 	// Step 5: Save workflow
 	data, err := yaml.Marshal(workflow)
 	if err != nil {
 		return fmt.Errorf("failed to marshal workflow to yaml: %w", err)
 	}
-	
+
 	// Get workflows directory
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
 	}
-	
+
 	workflowsDir := filepath.Join(home, ".opun", "workflows")
 	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
 		return fmt.Errorf("failed to create workflows directory: %w", err)
 	}
-	
+
 	// Save workflow
 	destPath := filepath.Join(workflowsDir, name+".yaml")
 	if err := os.WriteFile(destPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to save workflow: %w", err)
 	}
-	
+
 	fmt.Printf("✓ Added workflow '%s'\n", name)
 	fmt.Printf("  Saved to: %s\n", destPath)
 	fmt.Printf("  Access with: /%s\n", command)
-	
+
 	return nil
 }
 
@@ -396,17 +396,17 @@ func createInteractiveAgent(agentID string) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	model, err := Prompt("Enter agent model (e.g., sonnet, opus, flash):")
 	if err != nil {
 		return nil, err
 	}
-	
+
 	prompt, err := MultilinePrompt("Enter agent prompt:")
 	if err != nil {
 		return nil, err
 	}
-	
+
 	agent := map[string]interface{}{
 		"id":       agentID,
 		"provider": provider,
@@ -417,7 +417,7 @@ func createInteractiveAgent(agentID string) (map[string]interface{}, error) {
 			"timeout":     300,
 		},
 	}
-	
+
 	return agent, nil
 }
 
@@ -734,15 +734,14 @@ func addTool(path, name string) error {
 	return nil
 }
 
-
 // MultilinePrompt prompts for multi-line input with Enter to add new lines and ctrl+d to finish
 func MultilinePrompt(prompt string) (string, error) {
 	fmt.Printf("%s\n", prompt)
 	fmt.Println("(Press Enter to add new lines, Ctrl+D to finish)")
-	
+
 	var lines []string
 	reader := bufio.NewReader(os.Stdin)
-	
+
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
@@ -752,12 +751,11 @@ func MultilinePrompt(prompt string) (string, error) {
 			}
 			return "", err
 		}
-		
+
 		// Remove the trailing newline for processing
 		line = strings.TrimSuffix(line, "\n")
 		lines = append(lines, line)
 	}
-	
+
 	return strings.Join(lines, "\n"), nil
 }
-
