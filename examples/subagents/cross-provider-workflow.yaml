@@ -1,0 +1,143 @@
+# Cross-Provider Workflow Example
+# 
+# This workflow demonstrates how different AI providers can work together,
+# each handling tasks they excel at:
+# - Gemini: Initial analysis and research
+# - Claude: Detailed security review
+# - Qwen: Code refactoring suggestions
+#
+# Usage:
+#   opun run examples/subagents/cross-provider-workflow.yaml --file_path ./src/main.go
+#
+name: cross-provider-workflow
+version: 1.0.0
+description: Example workflow showing cross-provider subagent collaboration
+author: Opun Team
+
+# Input variables
+variables:
+  - name: file_path
+    description: Path to the file to analyze
+    type: string
+    required: true
+
+# Workflow settings
+settings:
+  output_dir: "./cross-provider-output/{{timestamp}}"
+  stop_on_error: false
+
+# Agent definitions using different providers
+agents:
+  # Step 1: Gemini for initial analysis (good at understanding context)
+  - id: analyze
+    name: "Initial Analysis"
+    provider: gemini
+    model: gemini-pro
+    prompt: |
+      Analyze the code structure and purpose of {{file_path}}.
+      
+      Focus on:
+      1. Overall architecture and design
+      2. Main components and their relationships
+      3. Technology stack and dependencies
+      4. Code organization and patterns
+      
+      Save your analysis to the output file.
+    output: initial-analysis.md
+    settings:
+      temperature: 0.4
+      timeout: 60
+    
+  # Step 2: Claude for security review (excellent at finding issues)
+  - id: security
+    name: "Security Review"
+    provider: claude
+    model: claude-3-sonnet
+    depends_on: [analyze]
+    prompt: |
+      Based on the initial analysis:
+      {{analyze.output}}
+      
+      Perform a detailed security review of {{file_path}}.
+      
+      Check for:
+      1. Common vulnerabilities (OWASP Top 10)
+      2. Input validation issues
+      3. Authentication/authorization problems
+      4. Data exposure risks
+      5. Injection vulnerabilities
+      
+      Rate each finding by severity and provide fixes.
+      Save the security report to the output file.
+    output: security-review.md
+    settings:
+      temperature: 0.2
+      quality_mode: thorough
+      timeout: 90
+    
+  # Step 3: Qwen for refactoring (strong at code generation)
+  - id: refactor
+    name: "Refactoring Suggestions"
+    provider: qwen
+    model: qwen-code
+    depends_on: [analyze, security]
+    prompt: |
+      Given the analysis and security findings:
+      - Analysis: {{analyze.output}}
+      - Security: {{security.output}}
+      
+      Generate refactored code for {{file_path}} that:
+      1. Addresses the security issues found
+      2. Improves code structure and readability
+      3. Optimizes performance where possible
+      4. Follows best practices
+      
+      Provide complete code snippets with explanations.
+      Save your refactoring suggestions to the output file.
+    output: refactoring-suggestions.md
+    settings:
+      temperature: 0.7
+      max_tokens: 6000
+      timeout: 120
+    
+  # Step 4: Summary report (back to Claude for consolidation)
+  - id: summary
+    name: "Final Summary"
+    provider: claude
+    model: claude-3-sonnet
+    depends_on: [refactor]
+    prompt: |
+      Create a concise summary report combining all findings:
+      - Initial Analysis: {{analyze.output}}
+      - Security Review: {{security.output}}
+      - Refactoring Suggestions: {{refactor.output}}
+      
+      Structure the report with:
+      1. Executive Summary (2-3 sentences)
+      2. Key Findings (bullet points)
+      3. Priority Actions (numbered list)
+      4. Implementation Timeline
+      
+      Keep it concise and actionable.
+      Save the summary to the output file.
+    output: summary-report.md
+    settings:
+      temperature: 0.3
+      quality_mode: standard
+    
+    # Success action
+    on_success:
+      - type: log
+        message: "Cross-provider analysis completed! Check {{output_dir}} for results."
+
+# Metadata
+metadata:
+  tags: ["example", "cross-provider", "analysis", "security", "refactoring"]
+  estimated_duration: "5-7 minutes"
+  description: |
+    This example workflow shows how to leverage different AI providers:
+    - Gemini excels at broad analysis and research
+    - Claude is exceptional at detailed review and reasoning
+    - Qwen is strong at code generation and refactoring
+    
+    By combining their strengths, we get better results than using a single provider.

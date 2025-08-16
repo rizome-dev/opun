@@ -37,6 +37,7 @@ type ClaudeProvider struct {
 	clipboard        utils.Clipboard
 	injectionManager *config.InjectionManager
 	environment      *config.ProviderEnvironment
+	subAgents        map[string]core.SubAgent
 }
 
 // NewClaudeProvider creates a new Claude provider
@@ -51,6 +52,7 @@ func NewClaudeProvider(providerConfig core.ProviderConfig) *ClaudeProvider {
 		BaseProvider:     baseProvider,
 		clipboard:        utils.NewClipboard(),
 		injectionManager: injectionManager,
+		subAgents:        make(map[string]core.SubAgent),
 	}
 }
 
@@ -427,4 +429,122 @@ func (p *ClaudeProvider) isInteractiveMode() bool {
 		return interactive
 	}
 	return true // Default to interactive
+}
+
+// SubAgentCapable implementation
+
+// SupportsSubAgents returns true as Claude supports subagents via Task tool
+func (p *ClaudeProvider) SupportsSubAgents() bool {
+	return true
+}
+
+// GetSubAgentType returns the declarative type for Claude
+func (p *ClaudeProvider) GetSubAgentType() core.SubAgentType {
+	return core.SubAgentTypeDeclarative
+}
+
+// CreateSubAgent creates a new subagent with the given configuration
+func (p *ClaudeProvider) CreateSubAgent(config core.SubAgentConfig) (core.SubAgent, error) {
+	// Import the claude adapter package
+	// This would be done at the top of the file in production
+	// For now, we'll create a simple wrapper
+	
+	if config.Provider != core.ProviderTypeClaude {
+		return nil, fmt.Errorf("invalid provider type for Claude: %s", config.Provider)
+	}
+	
+	// In production, this would use the claude.NewClaudeAdapter
+	// For now, return an error indicating the feature needs the adapter
+	return nil, fmt.Errorf("subagent creation requires claude adapter implementation")
+}
+
+// ListSubAgents returns available subagents
+func (p *ClaudeProvider) ListSubAgents() ([]core.SubAgentConfig, error) {
+	// Check .claude/agents directory for agent definitions
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get home directory: %w", err)
+	}
+	
+	agentsDir := filepath.Join(homeDir, ".claude", "agents")
+	if _, err := os.Stat(agentsDir); os.IsNotExist(err) {
+		return []core.SubAgentConfig{}, nil
+	}
+	
+	var configs []core.SubAgentConfig
+	
+	// Read agent definition files
+	entries, err := os.ReadDir(agentsDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read agents directory: %w", err)
+	}
+	
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
+			continue
+		}
+		
+		// Parse agent definition (simplified for now)
+		name := strings.TrimSuffix(entry.Name(), ".md")
+		configs = append(configs, core.SubAgentConfig{
+			Name:        name,
+			Type:        core.SubAgentTypeDeclarative,
+			Provider:    core.ProviderTypeClaude,
+			Strategy:    core.DelegationAutomatic,
+		})
+	}
+	
+	// Also return registered subagents
+	for _, agent := range p.subAgents {
+		configs = append(configs, agent.Config())
+	}
+	
+	return configs, nil
+}
+
+// GetSubAgent retrieves a subagent by name
+func (p *ClaudeProvider) GetSubAgent(name string) (core.SubAgent, error) {
+	if agent, exists := p.subAgents[name]; exists {
+		return agent, nil
+	}
+	
+	return nil, fmt.Errorf("subagent %s not found", name)
+}
+
+// Delegate delegates a task to an appropriate subagent
+func (p *ClaudeProvider) Delegate(ctx context.Context, task core.SubAgentTask) (*core.SubAgentResult, error) {
+	// Find best matching agent
+	var bestAgent core.SubAgent
+	for _, agent := range p.subAgents {
+		if agent.CanHandle(task) {
+			bestAgent = agent
+			break
+		}
+	}
+	
+	if bestAgent == nil {
+		return nil, fmt.Errorf("no suitable agent found for task %s", task.Name)
+	}
+	
+	return bestAgent.Execute(ctx, task)
+}
+
+// RegisterSubAgent registers a new subagent
+func (p *ClaudeProvider) RegisterSubAgent(agent core.SubAgent) error {
+	if agent == nil {
+		return fmt.Errorf("agent cannot be nil")
+	}
+	
+	p.subAgents[agent.Name()] = agent
+	return nil
+}
+
+// UnregisterSubAgent unregisters a subagent
+func (p *ClaudeProvider) UnregisterSubAgent(name string) error {
+	if _, exists := p.subAgents[name]; !exists {
+		return fmt.Errorf("agent %s not found", name)
+	}
+	
+	delete(p.subAgents, name)
+	return nil
 }

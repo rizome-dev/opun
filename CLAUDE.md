@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Opun is a Go-based Terminal Development Kit (TDK) that provides a standardized framework for managing AI code agents. It orchestrates Claude Code and Gemini CLI through PTY automation, offering workflow automation, multi-agent coordination, and extensibility through plugins and MCP servers.
+Opun is a Go-based Terminal Development Kit (TDK) that provides a standardized framework for managing AI code agents. It orchestrates Claude Code, Gemini CLI, and Qwen Code through PTY automation, offering workflow automation, cross-provider subagent orchestration, multi-agent coordination, and extensibility through plugins and MCP servers.
 
 ## Essential Commands
 
@@ -61,6 +61,7 @@ The system uses PTY automation to control AI providers:
 - **PTY Automation**: Terminal session management for provider interaction
 - **Session Isolation**: Each workflow gets its own session directory
 - **Workflow Engine**: YAML-based sequential/parallel agent orchestration
+- **Subagent System**: Cross-provider task delegation and specialization
 - **Plugin System**: Extensible via Go plugins, scripts, or JSON definitions
 - **PromptGarden**: Centralized prompt management with templating
 - **Event-Driven**: Components communicate via channels and callbacks
@@ -76,19 +77,71 @@ agents:
   - name: refactor
     prompt: "Refactor based on {{analyze.output}}"
     depends_on: [analyze]
+  # Using subagents for specialized tasks
+  - name: security
+    subagent: security-auditor
+    prompt: "Audit for vulnerabilities"
+    depends_on: [analyze]
 ```
 
 Key features:
 - Agent dependencies and output chaining
 - Variable substitution and file inclusion
+- Subagent delegation for specialized tasks
+- Cross-provider orchestration
 - Retry logic with exponential backoff
 - Conditional execution based on success/failure
+
+### Subagent System
+
+The subagent system enables cross-provider task delegation:
+
+```go
+// Core subagent interfaces in pkg/core/subagent.go
+type SubAgent interface {
+    GetName() string
+    GetCapabilities() []string
+    CanHandle(task SubAgentTask) bool
+    Execute(ctx context.Context, task SubAgentTask) (*SubAgentResult, error)
+}
+
+type SubAgentManager interface {
+    Register(agent SubAgent) error
+    Execute(ctx context.Context, task SubAgentTask, agentName string) (*SubAgentResult, error)
+    FindBestAgent(task SubAgentTask) (SubAgent, error)
+}
+```
+
+**Key Components**:
+- `internal/subagent/` - Subagent implementation and management
+- `internal/subagent/factory.go` - Creates subagents from configurations
+- `internal/subagent/manager.go` - Manages subagent registry and execution
+- `internal/cli/subagent.go` - CLI commands for subagent operations
+
+**Subagent Commands**:
+```bash
+opun subagent list                    # List all registered subagents
+opun subagent create <config>         # Create from configuration
+opun subagent delete <name>           # Remove a subagent
+opun subagent execute <name> <task>   # Execute task on specific agent
+opun subagent info <name>             # Show agent details
+```
+
+**Integration with Workflows**:
+Subagents can be used in workflows by specifying the `subagent` field:
+```yaml
+agents:
+  - id: reviewer
+    subagent: code-reviewer  # Use named subagent
+    prompt: "Review this code"
+```
 
 ### Important Implementation Details
 
 #### Provider Detection
 - Claude: Tries `claude` command, falls back to `npx claude-code`
 - Gemini: Direct command execution
+- Qwen: Tries `qwen` command
 - Ready patterns are provider-specific (e.g., Claude: "Type /help")
 
 #### Prompt Injection Methods
@@ -105,20 +158,22 @@ Key features:
 ```
 cmd/opun/          # CLI entry point (uses Charm's fang)
 internal/
-  cli/             # Cobra commands (add, chat, list, prompt, refactor, run, setup)
+  cli/             # Cobra commands (add, chat, list, prompt, refactor, run, setup, subagent)
   command/         # Command execution and registry
   io/              # Session management (managed and transparent)
   mcp/             # MCP (Model Context Protocol) integration  
   plugin/          # Plugin loading and management
   promptgarden/    # Prompt storage and templating
-  providers/       # AI provider implementations
+  providers/       # AI provider implementations (claude, gemini, qwen)
   pty/             # PTY automation and provider-specific handling
+  subagent/        # Subagent implementation and management
   workflow/        # YAML-based workflow engine
   utils/           # Utilities (clipboard operations)
 pkg/               # Public interfaces
   command/         # Command types
-  core/            # Core interfaces (Provider, Tool, MCP, Prompt)
+  core/            # Core interfaces (Provider, Tool, MCP, Prompt, SubAgent)
   plugin/          # Plugin types
+  subagent/        # Subagent types and interfaces
   workflow/        # Workflow types
 ```
 
@@ -136,6 +191,7 @@ pkg/               # Public interfaces
 ├── config.yaml         # Main configuration
 ├── promptgarden/       # Prompt storage
 ├── workflows/          # Workflow definitions
+├── subagents/          # Subagent configurations
 ├── actions/            # Action definitions (simple command wrappers)
 ├── plugins/           # Installed plugins
 ├── mcp/              # MCP server installations
@@ -149,3 +205,83 @@ pkg/               # Public interfaces
 - PTY sessions are reused within a workflow for efficiency
 - Clipboard integration is critical for Claude prompt injection
 - Provider configurations support MCP servers and tools
+- Subagents enable cross-provider orchestration with capability-based routing
+- MCP Task server integration provides advanced tool capabilities
+
+## Subagent Development
+
+### Creating a Subagent
+
+Subagents are created from configuration files or programmatically:
+
+```go
+// Using the factory
+import "github.com/rizome-dev/opun/internal/subagent"
+
+config := core.SubAgentConfig{
+    Name:         "my-agent",
+    Provider:     core.ProviderTypeClaude,
+    Model:        "claude-3-sonnet",
+    Capabilities: []string{"code-review", "security"},
+    SystemPrompt: "You are an expert reviewer...",
+}
+
+agent, err := subagent.CreateSubAgent(config)
+```
+
+### Registering with Manager
+
+```go
+manager := subagent.NewManager()
+err := manager.Register(agent)
+```
+
+### Executing Tasks
+
+```go
+task := core.SubAgentTask{
+    Name:        "Review Code",
+    Description: "Review the authentication module",
+    Context:     map[string]interface{}{"file": "auth.go"},
+    Requirements: []string{"code-review", "security"},
+}
+
+result, err := manager.Execute(ctx, task, "my-agent")
+// Or let the manager find the best agent
+result, err = manager.ExecuteBest(ctx, task)
+```
+
+### Workflow Integration
+
+In workflows, subagents are referenced by name:
+
+```yaml
+agents:
+  - id: step1
+    subagent: my-agent
+    prompt: "Perform the task"
+```
+
+The workflow engine automatically:
+1. Looks up the subagent by name
+2. Creates a provider session if needed
+3. Executes the task with the subagent's configuration
+4. Captures output for downstream agents
+
+### Testing Subagents
+
+```go
+// Create a mock subagent for testing
+mockAgent := &MockSubAgent{
+    name: "test-agent",
+    capabilities: []string{"test"},
+}
+
+// Test capability matching
+assert.True(t, mockAgent.CanHandle(task))
+
+// Test execution
+result, err := mockAgent.Execute(ctx, task)
+assert.NoError(t, err)
+assert.NotNil(t, result)
+```

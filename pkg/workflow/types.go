@@ -57,6 +57,14 @@ type Agent struct {
 	Settings  AgentSettings          `yaml:"settings" json:"settings"`
 	OnSuccess []Action               `yaml:"on_success" json:"on_success"`
 	OnFailure []Action               `yaml:"on_failure" json:"on_failure"`
+	SubAgent  *SubAgentConfig        `yaml:"subagent,omitempty" json:"subagent,omitempty"`
+}
+
+// SubAgentConfig represents subagent configuration within a workflow
+type SubAgentConfig struct {
+	Name         string   `yaml:"name" json:"name"`
+	Capabilities []string `yaml:"capabilities,omitempty" json:"capabilities,omitempty"`
+	Strategy     string   `yaml:"strategy,omitempty" json:"strategy,omitempty"`
 }
 
 // AgentSettings contains agent-specific settings

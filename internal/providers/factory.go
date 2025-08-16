@@ -18,18 +18,92 @@ package providers
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/rizome-dev/opun/internal/subagent"
 	"github.com/rizome-dev/opun/pkg/core"
+	subagentpkg "github.com/rizome-dev/opun/pkg/subagent"
 )
 
 // ProviderFactory creates providers
 type ProviderFactory struct {
+	subAgentManager *subagentpkg.Manager
 }
 
 // NewProviderFactory creates a new provider factory
 func NewProviderFactory() *ProviderFactory {
-	return &ProviderFactory{}
+	return &ProviderFactory{
+		subAgentManager: subagentpkg.NewManager(),
+	}
+}
+
+// GetSubAgentManager returns the subagent manager
+func (f *ProviderFactory) GetSubAgentManager() *subagentpkg.Manager {
+	return f.subAgentManager
+}
+
+// InitializeSubAgents initializes subagents from configuration
+func (f *ProviderFactory) InitializeSubAgents() error {
+	// Load subagent configurations
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	configDir := filepath.Join(home, ".opun", "subagents")
+	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+		// Create directory if it doesn't exist
+		if err := os.MkdirAll(configDir, 0755); err != nil {
+			return err
+		}
+	}
+
+	// Register default provider adapters with the manager
+	// These will be created using the subagent factory
+	factory := subagent.NewFactory()
+	
+	// Claude adapter
+	claudeConfig := core.SubAgentConfig{
+		Name:        "claude-default",
+		Description: "Default Claude subagent",
+		Provider:    core.ProviderTypeClaude,
+		Model:       "claude-3-sonnet",
+		Strategy:    core.DelegationAutomatic,
+		Settings:    make(map[string]interface{}),
+	}
+	if claudeAdapter, err := factory.CreateSubAgent(claudeConfig); err == nil {
+		f.subAgentManager.Register(claudeAdapter)
+	}
+
+	// Gemini adapter
+	geminiConfig := core.SubAgentConfig{
+		Name:        "gemini-default",
+		Description: "Default Gemini subagent",
+		Provider:    core.ProviderTypeGemini,
+		Model:       "gemini-pro",
+		Strategy:    core.DelegationAutomatic,
+		Settings:    make(map[string]interface{}),
+	}
+	if geminiAdapter, err := factory.CreateSubAgent(geminiConfig); err == nil {
+		f.subAgentManager.Register(geminiAdapter)
+	}
+
+	// Qwen adapter
+	qwenConfig := core.SubAgentConfig{
+		Name:        "qwen-default",
+		Description: "Default Qwen subagent",
+		Provider:    core.ProviderTypeQwen,
+		Model:       "qwen-coder",
+		Strategy:    core.DelegationAutomatic,
+		Settings:    make(map[string]interface{}),
+	}
+	if qwenAdapter, err := factory.CreateSubAgent(qwenConfig); err == nil {
+		f.subAgentManager.Register(qwenAdapter)
+	}
+
+	return nil
 }
 
 // CreateProvider creates a provider instance with the given configuration
