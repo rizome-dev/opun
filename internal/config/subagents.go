@@ -92,15 +92,63 @@ func (l *SubAgentConfigLoader) LoadFile(path string) (core.SubAgentConfig, error
 
 	var config core.SubAgentConfig
 	
-	// Try YAML first, then JSON
-	if strings.HasSuffix(path, ".json") {
-		err = json.Unmarshal(data, &config)
+	// For YAML files, we need to handle the providers array format
+	if !strings.HasSuffix(path, ".json") {
+		// Parse into a temporary structure that supports both formats
+		var tempConfig struct {
+			Name         string                 `yaml:"name"`
+			Description  string                 `yaml:"description"`
+			Providers    []string               `yaml:"providers"` // Array format
+			Provider     core.ProviderType      `yaml:"provider"`  // Single format
+			Model        string                 `yaml:"model"`
+			Capabilities []string              `yaml:"capabilities"`
+			Context      []string              `yaml:"context"`
+			SystemPrompt string                 `yaml:"system_prompt"`
+			Content      string                 `yaml:"content"` // Alternative to system_prompt
+			Metadata     map[string]interface{} `yaml:"metadata"`
+			Settings     map[string]interface{} `yaml:"settings"`
+			Tags         []string              `yaml:"tags"`
+		}
+		
+		if err := yaml.Unmarshal(data, &tempConfig); err != nil {
+			return core.SubAgentConfig{}, fmt.Errorf("failed to parse YAML: %w", err)
+		}
+		
+		// Map to the standard config structure
+		config.Name = tempConfig.Name
+		config.Description = tempConfig.Description
+		config.Model = tempConfig.Model
+		config.Capabilities = tempConfig.Capabilities
+		config.Context = tempConfig.Context
+		config.Metadata = tempConfig.Metadata
+		config.Settings = tempConfig.Settings
+		
+		// Handle system prompt (content takes precedence)
+		if tempConfig.Content != "" {
+			config.SystemPrompt = tempConfig.Content
+		} else {
+			config.SystemPrompt = tempConfig.SystemPrompt
+		}
+		
+		// Handle provider (providers array takes precedence)
+		if len(tempConfig.Providers) > 0 {
+			// Take the first provider from the array
+			config.Provider = core.ProviderType(tempConfig.Providers[0])
+		} else if tempConfig.Provider != "" {
+			config.Provider = tempConfig.Provider
+		}
+		
+		// Extract model from metadata if not set
+		if config.Model == "" && tempConfig.Metadata != nil {
+			if model, ok := tempConfig.Metadata["model"].(string); ok {
+				config.Model = model
+			}
+		}
 	} else {
-		err = yaml.Unmarshal(data, &config)
-	}
-
-	if err != nil {
-		return core.SubAgentConfig{}, fmt.Errorf("failed to parse config: %w", err)
+		// JSON format
+		if err := json.Unmarshal(data, &config); err != nil {
+			return core.SubAgentConfig{}, fmt.Errorf("failed to parse JSON: %w", err)
+		}
 	}
 
 	// Validate the configuration

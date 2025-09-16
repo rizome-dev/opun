@@ -18,11 +18,13 @@ package providers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/rizome-dev/opun/internal/config"
 	"github.com/rizome-dev/opun/internal/io"
@@ -38,6 +40,7 @@ type ClaudeProvider struct {
 	injectionManager *config.InjectionManager
 	environment      *config.ProviderEnvironment
 	subAgents        map[string]core.SubAgent
+	generatedAgents  []string // Track generated agent files for cleanup
 }
 
 // NewClaudeProvider creates a new Claude provider
@@ -53,6 +56,7 @@ func NewClaudeProvider(providerConfig core.ProviderConfig) *ClaudeProvider {
 		clipboard:        utils.NewClipboard(),
 		injectionManager: injectionManager,
 		subAgents:        make(map[string]core.SubAgent),
+		generatedAgents:  []string{},
 	}
 }
 
@@ -135,6 +139,12 @@ func (p *ClaudeProvider) PrepareSession(ctx context.Context, sessionID string) e
 		p.environment = env
 	}
 
+	// Prepare subagents for Claude Code
+	if err := p.prepareSubAgents(); err != nil {
+		fmt.Printf("Warning: failed to prepare subagents: %v\n", err)
+		// Don't fail session preparation if subagent bridge fails
+	}
+
 	return nil
 }
 
@@ -147,6 +157,11 @@ func (p *ClaudeProvider) CleanupSession(ctx context.Context, sessionID string) e
 			fmt.Printf("Warning: failed to cleanup environment: %v\n", err)
 		}
 		p.environment = nil
+	}
+
+	// Clean up generated subagent files
+	if err := p.cleanupSubAgents(); err != nil {
+		fmt.Printf("Warning: failed to cleanup subagents: %v\n", err)
 	}
 
 	// Clean up session directory
@@ -547,4 +562,218 @@ func (p *ClaudeProvider) UnregisterSubAgent(name string) error {
 	
 	delete(p.subAgents, name)
 	return nil
+}
+
+// SyncSubAgentsToClaude synchronizes Opun subagents to Claude Code format
+// This creates persistent markdown files in ~/.claude/agents/ from ~/.opun/subagents/ configs
+func SyncSubAgentsToClaude() error {
+	p := &ClaudeProvider{generatedAgents: []string{}}
+	return p.syncSubAgents(false)
+}
+
+// prepareSubAgents creates markdown files for Claude Code from Opun subagent configs
+func (p *ClaudeProvider) prepareSubAgents() error {
+	return p.syncSubAgents(true)
+}
+
+// syncSubAgents performs the actual sync, with option for temporary vs persistent
+func (p *ClaudeProvider) syncSubAgents(temporary bool) error {
+	// Load subagent configurations from ~/.opun/subagents/
+	loader, err := config.NewSubAgentConfigLoader()
+	if err != nil {
+		return fmt.Errorf("failed to create config loader: %w", err)
+	}
+
+	configs, err := loader.LoadAll()
+	if err != nil {
+		return fmt.Errorf("failed to load subagent configs: %w", err)
+	}
+
+	if len(configs) == 0 {
+		return nil // No subagents to prepare
+	}
+
+	// Get home directory for .claude path
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	// Create ~/.claude/agents/ directory
+	agentsDir := filepath.Join(homeDir, ".claude", "agents")
+	if err := os.MkdirAll(agentsDir, 0755); err != nil {
+		return fmt.Errorf("failed to create agents directory: %w", err)
+	}
+
+	var syncedAgents []string
+
+	// Generate markdown files for each subagent
+	for _, cfg := range configs {
+		// Only process agents that support Claude
+		if cfg.Provider != core.ProviderTypeClaude && cfg.Provider != "" {
+			continue
+		}
+
+		markdown := p.generateAgentMarkdown(cfg)
+		filename := fmt.Sprintf("%s.md", cfg.Name)
+		filepath := filepath.Join(agentsDir, filename)
+
+		if err := os.WriteFile(filepath, []byte(markdown), 0644); err != nil {
+			return fmt.Errorf("failed to write agent file %s: %w", filename, err)
+		}
+
+		// Track generated files
+		if temporary && p != nil {
+			p.generatedAgents = append(p.generatedAgents, filepath)
+		}
+		syncedAgents = append(syncedAgents, cfg.Name)
+	}
+
+	// Create a manifest file to track Opun-managed agents (for persistent sync)
+	if !temporary {
+		manifest := struct {
+			Version string   `json:"version"`
+			Agents  []string `json:"agents"`
+			Updated string   `json:"updated"`
+		}{
+			Version: "1.0",
+			Agents:  syncedAgents,
+			Updated: time.Now().Format(time.RFC3339),
+		}
+
+		manifestPath := filepath.Join(agentsDir, ".opun-manifest.json")
+		data, _ := json.MarshalIndent(manifest, "", "  ")
+		if err := os.WriteFile(manifestPath, data, 0644); err != nil {
+			fmt.Printf("Warning: failed to write manifest: %v\n", err)
+		}
+
+		fmt.Printf("✅ Synced %d subagents to Claude Code\n", len(syncedAgents))
+		for _, name := range syncedAgents {
+			fmt.Printf("  - %s\n", name)
+		}
+	}
+
+	return nil
+}
+
+// generateAgentMarkdown converts a SubAgentConfig to Claude Task tool markdown format
+func (p *ClaudeProvider) generateAgentMarkdown(cfg core.SubAgentConfig) string {
+	var sb strings.Builder
+
+	// Start with YAML frontmatter (required for Claude Code)
+	sb.WriteString("---\n")
+	sb.WriteString(fmt.Sprintf("name: %s\n", cfg.Name))
+	
+	// Description - extract first line if multi-line
+	description := cfg.Description
+	if description == "" {
+		description = fmt.Sprintf("Specialized agent for %s tasks", cfg.Name)
+	}
+	// Take only the first line for the frontmatter description
+	if idx := strings.Index(description, "\n"); idx > 0 {
+		description = description[:idx]
+	}
+	sb.WriteString(fmt.Sprintf("description: %s\n", description))
+	
+	// Model preference
+	model := cfg.Model
+	if model == "" {
+		model = "sonnet" // Default model
+	}
+	sb.WriteString(fmt.Sprintf("model: %s\n", model))
+	
+	// Capabilities
+	sb.WriteString("capabilities:\n")
+	if len(cfg.Capabilities) > 0 {
+		for _, cap := range cfg.Capabilities {
+			sb.WriteString(fmt.Sprintf("  - %s\n", cap))
+		}
+	} else {
+		sb.WriteString("  []\n")
+	}
+	
+	// Context patterns
+	sb.WriteString("context:\n")
+	if len(cfg.Context) > 0 {
+		for _, ctx := range cfg.Context {
+			sb.WriteString(fmt.Sprintf("  - %s\n", ctx))
+		}
+	} else {
+		sb.WriteString("  []\n")
+	}
+	
+	// Instructions (system prompt)
+	sb.WriteString("instructions: |\n")
+	if cfg.SystemPrompt != "" {
+		// Indent each line of the system prompt
+		lines := strings.Split(cfg.SystemPrompt, "\n")
+		for _, line := range lines {
+			sb.WriteString(fmt.Sprintf("  %s\n", line))
+		}
+	} else if cfg.Description != "" {
+		// Use full description as instructions if no system prompt
+		lines := strings.Split(cfg.Description, "\n")
+		for _, line := range lines {
+			sb.WriteString(fmt.Sprintf("  %s\n", line))
+		}
+	} else {
+		sb.WriteString(fmt.Sprintf("  You are %s, a specialized Opun agent.\n", cfg.Name))
+	}
+	
+	// End frontmatter
+	sb.WriteString("---\n\n")
+	
+	// Now add the markdown content (for readability in the UI)
+	sb.WriteString(fmt.Sprintf("# %s\n\n", cfg.Name))
+	
+	if cfg.Description != "" {
+		sb.WriteString(fmt.Sprintf("%s\n\n", cfg.Description))
+	}
+
+	// Add capabilities section if present
+	if len(cfg.Capabilities) > 0 {
+		sb.WriteString("## Capabilities\n\n")
+		for _, cap := range cfg.Capabilities {
+			sb.WriteString(fmt.Sprintf("- %s\n", cap))
+		}
+		sb.WriteString("\n")
+	}
+
+	// Add context patterns if available
+	if len(cfg.Context) > 0 {
+		sb.WriteString("## Context Patterns\n\n")
+		sb.WriteString("This agent should be used when:\n")
+		for _, ctx := range cfg.Context {
+			sb.WriteString(fmt.Sprintf("- %s\n", ctx))
+		}
+		sb.WriteString("\n")
+	}
+
+	// Add the system prompt as instructions if present
+	if cfg.SystemPrompt != "" {
+		sb.WriteString("## Instructions\n\n")
+		sb.WriteString(cfg.SystemPrompt)
+		sb.WriteString("\n")
+	}
+
+	return sb.String()
+}
+
+// cleanupSubAgents removes generated markdown files from ~/.claude/agents/
+func (p *ClaudeProvider) cleanupSubAgents() error {
+	var lastErr error
+	
+	for _, filepath := range p.generatedAgents {
+		if err := os.Remove(filepath); err != nil {
+			if !os.IsNotExist(err) {
+				lastErr = err
+				fmt.Printf("Warning: failed to remove %s: %v\n", filepath, err)
+			}
+		}
+	}
+
+	// Clear the tracked files
+	p.generatedAgents = []string{}
+	
+	return lastErr
 }

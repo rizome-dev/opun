@@ -1,14 +1,22 @@
+<!-- You have been trained on a corpus that was cutoff at sometime before the current date. You must constantly ground yourself in the current date, to avoid utilizing outdated or wrong information. You have access to a powerful Web Search tool, as well as others, which can assist in grounding yourself in the current SOTA & Usage Guidelines for the task at hand. -->
+<!-- Current Date: 2025-09-05 02:23:49 UTC -->
+
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file is managed by Rizome CLI. Do not edit directly.
+Update RIZOME.md and run 'rizome sync' instead.
 
-## Overview
+Project overview and context.
+
+## Common Instructions
+
+### Overview
 
 Opun is a Go-based Terminal Development Kit (TDK) that provides a standardized framework for managing AI code agents. It orchestrates Claude Code, Gemini CLI, and Qwen Code through PTY automation, offering workflow automation, cross-provider subagent orchestration, multi-agent coordination, and extensibility through plugins and MCP servers.
 
-## Essential Commands
+### Essential Commands
 
-### Development
+#### Development
 ```bash
 make build              # Build the binary
 make install           # Build and install to /usr/local/bin  
@@ -16,7 +24,7 @@ make dev               # Quick development rebuild (no optimization)
 make run ARGS="--help" # Run the application with arguments
 ```
 
-### Testing
+#### Testing
 ```bash
 make test              # Run unit tests
 make test-coverage     # Run tests with coverage report
@@ -30,7 +38,7 @@ make benchmark         # Run benchmarks
 go test -v -run TestName ./path/to/package
 ```
 
-### Code Quality
+#### Code Quality
 ```bash
 make fmt              # Format code
 make vet              # Vet code
@@ -38,7 +46,7 @@ make lint             # Run golangci-lint
 make check            # Run all checks (fmt, vet, lint, test)
 ```
 
-### Additional Commands
+#### Additional Commands
 ```bash
 make deps              # Download dependencies
 make setup             # Install development tools (golangci-lint, gosec, goreleaser)
@@ -48,16 +56,16 @@ make providers-check   # Check if AI providers are installed
 make fix-permissions   # Fix ownership of ~/.opun directory
 ```
 
-## Architecture Overview
+### Architecture Overview
 
-### Provider Abstraction
+#### Provider Abstraction
 The system uses PTY automation to control AI providers:
 - `pkg/core/provider.go` - Core Provider interface
 - `internal/providers/` - Claude and Gemini implementations
 - Provider creation: `internal/providers/factory.go`
 - PTY management: `internal/pty/` (session control and automation)
 
-### Key Architecture Patterns
+#### Key Architecture Patterns
 - **PTY Automation**: Terminal session management for provider interaction
 - **Session Isolation**: Each workflow gets its own session directory
 - **Workflow Engine**: YAML-based sequential/parallel agent orchestration
@@ -66,7 +74,7 @@ The system uses PTY automation to control AI providers:
 - **PromptGarden**: Centralized prompt management with templating
 - **Event-Driven**: Components communicate via channels and callbacks
 
-### Workflow System
+#### Workflow System
 Workflows are YAML files that orchestrate multiple agents:
 ```yaml
 agents:
@@ -92,7 +100,7 @@ Key features:
 - Retry logic with exponential backoff
 - Conditional execution based on success/failure
 
-### Subagent System
+#### Subagent System
 
 The subagent system enables cross-provider task delegation:
 
@@ -136,25 +144,25 @@ agents:
     prompt: "Review this code"
 ```
 
-### Important Implementation Details
+#### Important Implementation Details
 
-#### Provider Detection
+##### Provider Detection
 - Claude: Tries `claude` command, falls back to `npx claude-code`
 - Gemini: Direct command execution
 - Qwen: Tries `qwen` command
 - Ready patterns are provider-specific (e.g., Claude: "Type /help")
 
-#### Prompt Injection Methods
+##### Prompt Injection Methods
 - **Clipboard**: Used by Claude (simulates Cmd+V)
 - **File**: Write to temp file and reference
 - **Stdin**: Direct pipe to provider
 
-#### Error Handling
+##### Error Handling
 - `InteractiveModeRequiredError` - Triggers interactive mode for auth
 - Workflows support `continue_on_error` and `stop_on_error`
 - PTY sessions handle provider crashes gracefully
 
-### Project Structure
+#### Project Structure
 ```
 cmd/opun/          # CLI entry point (uses Charm's fang)
 internal/
@@ -177,7 +185,7 @@ pkg/               # Public interfaces
   workflow/        # Workflow types
 ```
 
-### Testing Approach
+#### Testing Approach
 - Unit tests alongside code files (`*_test.go`)
 - Integration tests in `test/integration/`
 - E2E tests in `test/e2e/`
@@ -185,7 +193,7 @@ pkg/               # Public interfaces
 - Use testify for assertions
 - Test fixtures in `internal/workflow/test-prompts/`
 
-### Configuration and Storage
+#### Configuration and Storage
 ```
 ~/.opun/
 ├── config.yaml         # Main configuration
@@ -198,7 +206,7 @@ pkg/               # Public interfaces
 └── sessions/         # Session data
 ```
 
-### Key Implementation Notes
+#### Key Implementation Notes
 - **NEVER create duplicate files with suffixes like `_enhanced`, `_new`, `_v2`** - Always modify original files
 - The architecture is moving from API-based to PTY-based automation
 - Each workflow execution creates an isolated session
@@ -208,9 +216,9 @@ pkg/               # Public interfaces
 - Subagents enable cross-provider orchestration with capability-based routing
 - MCP Task server integration provides advanced tool capabilities
 
-## Subagent Development
+### Subagent Development
 
-### Creating a Subagent
+#### Creating a Subagent
 
 Subagents are created from configuration files or programmatically:
 
@@ -229,14 +237,14 @@ config := core.SubAgentConfig{
 agent, err := subagent.CreateSubAgent(config)
 ```
 
-### Registering with Manager
+#### Registering with Manager
 
 ```go
 manager := subagent.NewManager()
 err := manager.Register(agent)
 ```
 
-### Executing Tasks
+#### Executing Tasks
 
 ```go
 task := core.SubAgentTask{
@@ -251,7 +259,7 @@ result, err := manager.Execute(ctx, task, "my-agent")
 result, err = manager.ExecuteBest(ctx, task)
 ```
 
-### Workflow Integration
+#### Workflow Integration
 
 In workflows, subagents are referenced by name:
 
@@ -268,7 +276,7 @@ The workflow engine automatically:
 3. Executes the task with the subagent's configuration
 4. Captures output for downstream agents
 
-### Testing Subagents
+#### Testing Subagents
 
 ```go
 // Create a mock subagent for testing
@@ -285,3 +293,12 @@ result, err := mockAgent.Execute(ctx, task)
 assert.NoError(t, err)
 assert.NotNil(t, result)
 ```
+
+Instructions that apply to all providers:
+- Project type and technology stack
+- Coding standards and conventions
+- General best practices
+
+## CLAUDE-Specific Instructions
+
+Claude-specific instructions

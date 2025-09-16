@@ -26,6 +26,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/rizome-dev/opun/internal/providers"
 	"github.com/rizome-dev/opun/internal/subagent"
 	"github.com/rizome-dev/opun/pkg/core"
 	subagentpkg "github.com/rizome-dev/opun/pkg/subagent"
@@ -79,6 +80,7 @@ Subagents enable sophisticated task delegation and cross-provider coordination.`
 		subAgentDeleteCmd(),
 		subAgentExecuteCmd(),
 		subAgentInfoCmd(),
+		subAgentSyncCmd(),
 	)
 
 	return cmd
@@ -419,6 +421,37 @@ func subAgentInfoCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// subAgentSyncCmd syncs subagents to provider formats
+func subAgentSyncCmd() *cobra.Command {
+	var provider string
+	
+	cmd := &cobra.Command{
+		Use:   "sync",
+		Short: "Sync subagents to provider formats",
+		Long:  `Synchronize Opun subagent configurations to provider-specific formats.
+
+Currently supports:
+  - Claude: Creates markdown files in ~/.claude/agents/`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Default to Claude if no provider specified
+			if provider == "" || provider == "claude" {
+				fmt.Println("🔄 Syncing subagents to Claude Code...")
+				if err := providers.SyncSubAgentsToClaude(); err != nil {
+					return fmt.Errorf("failed to sync to Claude: %w", err)
+				}
+			} else {
+				return fmt.Errorf("unsupported provider: %s (currently only 'claude' is supported)", provider)
+			}
+			
+			return nil
+		},
+	}
+	
+	cmd.Flags().StringVarP(&provider, "provider", "p", "claude", "Provider to sync to (claude)")
+	
+	return cmd
 }
 
 // Helper functions for configuration management
