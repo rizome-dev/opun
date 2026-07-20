@@ -18,6 +18,7 @@ package providers
 
 import (
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,13 +47,7 @@ func (f *ProviderFactory) GetSubAgentManager() *subagentpkg.Manager {
 
 // InitializeSubAgents initializes subagents from configuration
 func (f *ProviderFactory) InitializeSubAgents() error {
-	// Load subagent configurations
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	configDir := filepath.Join(home, ".opun", "subagents")
+	configDir := filepath.Join(utils.OpunDir(), "subagents")
 	if _, err := os.Stat(configDir); os.IsNotExist(err) {
 		// Create directory if it doesn't exist
 		if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -63,13 +58,13 @@ func (f *ProviderFactory) InitializeSubAgents() error {
 	// Register default provider adapters with the manager
 	// These will be created using the subagent factory
 	factory := subagent.NewFactory()
-	
+
 	// Claude adapter
 	claudeConfig := core.SubAgentConfig{
 		Name:        "claude-default",
 		Description: "Default Claude subagent",
 		Provider:    core.ProviderTypeClaude,
-		Model:       "claude-3-sonnet",
+		Model:       "sonnet",
 		Strategy:    core.DelegationAutomatic,
 		Settings:    make(map[string]interface{}),
 	}
@@ -82,7 +77,7 @@ func (f *ProviderFactory) InitializeSubAgents() error {
 		Name:        "gemini-default",
 		Description: "Default Gemini subagent",
 		Provider:    core.ProviderTypeGemini,
-		Model:       "gemini-pro",
+		Model:       "auto",
 		Strategy:    core.DelegationAutomatic,
 		Settings:    make(map[string]interface{}),
 	}
@@ -95,7 +90,7 @@ func (f *ProviderFactory) InitializeSubAgents() error {
 		Name:        "qwen-default",
 		Description: "Default Qwen subagent",
 		Provider:    core.ProviderTypeQwen,
-		Model:       "qwen-coder",
+		Model:       "qwen3-coder-plus",
 		Strategy:    core.DelegationAutomatic,
 		Settings:    make(map[string]interface{}),
 	}
@@ -166,10 +161,10 @@ func (f *ProviderFactory) CreateProviderFromType(providerType string, name strin
 		config.Args = []string{}
 	case "gemini":
 		config.Command = "gemini"
-		config.Args = []string{"chat"}
+		config.Args = []string{}
 	case "qwen":
 		config.Command = "qwen"
-		config.Args = []string{"chat"}
+		config.Args = []string{}
 	}
 
 	return f.CreateProvider(config)
@@ -181,9 +176,9 @@ func getDefaultModel(providerType string) string {
 	case "claude":
 		return "sonnet"
 	case "gemini":
-		return "gemini-pro"
+		return "auto"
 	case "qwen":
-		return "code"
+		return "qwen3-coder-plus"
 	default:
 		return ""
 	}

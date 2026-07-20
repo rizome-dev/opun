@@ -19,6 +19,7 @@ package cli
 import (
 	"bufio"
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,12 +102,7 @@ func updateWorkflow(name, path string) error {
 	}
 
 	// Get workflow directory
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	workflowDir := filepath.Join(home, ".opun", "workflows")
+	workflowDir := filepath.Join(utils.OpunDir(), "workflows")
 
 	// Check if workflow exists
 	workflowPath := filepath.Join(workflowDir, name+".yaml")
@@ -147,12 +143,7 @@ func updatePrompt(name, path string) error {
 	}
 
 	// Get prompt garden
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	gardenPath := filepath.Join(home, ".opun", "promptgarden")
+	gardenPath := filepath.Join(utils.OpunDir(), "promptgarden")
 	garden, err := promptgarden.NewGarden(gardenPath)
 	if err != nil {
 		return fmt.Errorf("failed to access prompt garden: %w", err)
@@ -203,12 +194,7 @@ func updateAction(name, path string) error {
 	}
 
 	// Get actions directory
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	actionsDir := filepath.Join(home, ".opun", "actions")
+	actionsDir := filepath.Join(utils.OpunDir(), "actions")
 
 	// Check if action exists
 	actionPath := filepath.Join(actionsDir, name+".yaml")
@@ -493,12 +479,7 @@ func runInteractiveEdit(item *updateItem) error {
 
 func handleInteractiveWorkflowEdit(item *updateItem) error {
 	// Get workflows directory
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	workflowsDir := filepath.Join(home, ".opun", "workflows")
+	workflowsDir := filepath.Join(utils.OpunDir(), "workflows")
 	workflowPath := filepath.Join(workflowsDir, item.name+".yaml")
 
 	// Read existing workflow
@@ -571,12 +552,7 @@ func getStringField(m map[string]interface{}, key string) string {
 
 func handleInteractivePromptEdit(item *updateItem) error {
 	// Get prompt garden
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	gardenPath := filepath.Join(home, ".opun", "promptgarden")
+	gardenPath := filepath.Join(utils.OpunDir(), "promptgarden")
 	garden, err := promptgarden.NewGarden(gardenPath)
 	if err != nil {
 		return fmt.Errorf("failed to access prompt garden: %w", err)
@@ -621,12 +597,7 @@ func handleInteractivePromptEdit(item *updateItem) error {
 
 func handleInteractiveToolEdit(item *updateItem) error {
 	// Get tools directory
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	toolsDir := filepath.Join(home, ".opun", "tools")
+	toolsDir := filepath.Join(utils.OpunDir(), "tools")
 	toolPath := filepath.Join(toolsDir, item.name+".yaml")
 
 	// Read existing tool
@@ -672,12 +643,7 @@ func handleInteractiveToolEdit(item *updateItem) error {
 
 func handleInteractiveActionEdit(item *updateItem) error {
 	// Get actions directory
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	actionsDir := filepath.Join(home, ".opun", "actions")
+	actionsDir := filepath.Join(utils.OpunDir(), "actions")
 	actionPath := filepath.Join(actionsDir, item.name+".yaml")
 
 	// Read existing action
@@ -797,12 +763,7 @@ func selectUpdateType() (string, error) {
 
 // getWorkflowItems returns all available workflows as update items
 func getWorkflowItems() ([]updateItem, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-
-	workflowDir := filepath.Join(home, ".opun", "workflows")
+	workflowDir := filepath.Join(utils.OpunDir(), "workflows")
 	if _, err := os.Stat(workflowDir); os.IsNotExist(err) {
 		return []updateItem{}, nil
 	}
@@ -849,12 +810,7 @@ func getWorkflowItems() ([]updateItem, error) {
 
 // getPromptItems returns all available prompts as update items
 func getPromptItems() ([]updateItem, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-
-	gardenPath := filepath.Join(home, ".opun", "promptgarden")
+	gardenPath := filepath.Join(utils.OpunDir(), "promptgarden")
 	if _, err := os.Stat(gardenPath); os.IsNotExist(err) {
 		return []updateItem{}, nil
 	}
@@ -888,12 +844,7 @@ func getPromptItems() ([]updateItem, error) {
 
 // getToolItems returns all available tools as update items
 func getToolItems() ([]updateItem, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-
-	actionsDir := filepath.Join(home, ".opun", "actions")
+	actionsDir := filepath.Join(utils.OpunDir(), "actions")
 	if _, err := os.Stat(actionsDir); os.IsNotExist(err) {
 		return []updateItem{}, nil
 	}

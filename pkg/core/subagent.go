@@ -50,23 +50,23 @@ const (
 // SubAgentConfig defines configuration for a subagent
 type SubAgentConfig struct {
 	// Basic information
-	Name        string                 `json:"name" yaml:"name"`
-	Type        SubAgentType           `json:"type" yaml:"type"`
-	Description string                 `json:"description" yaml:"description"`
-	Provider    ProviderType           `json:"provider" yaml:"provider"`
-	Model       string                 `json:"model" yaml:"model"`
+	Name        string       `json:"name" yaml:"name"`
+	Type        SubAgentType `json:"type" yaml:"type"`
+	Description string       `json:"description" yaml:"description"`
+	Provider    ProviderType `json:"provider" yaml:"provider"`
+	Model       string       `json:"model" yaml:"model"`
 
 	// Delegation settings
-	Strategy    DelegationStrategy     `json:"strategy" yaml:"strategy"`
-	Context     []string               `json:"context" yaml:"context"`       // Context patterns for automatic delegation
-	Capabilities []string              `json:"capabilities" yaml:"capabilities"` // What the agent can do
-	Priority    int                    `json:"priority" yaml:"priority"`     // Priority for conflict resolution
+	Strategy     DelegationStrategy `json:"strategy" yaml:"strategy"`
+	Context      []string           `json:"context" yaml:"context"`           // Context patterns for automatic delegation
+	Capabilities []string           `json:"capabilities" yaml:"capabilities"` // What the agent can do
+	Priority     int                `json:"priority" yaml:"priority"`         // Priority for conflict resolution
 
 	// Execution settings
-	MaxRetries  int                    `json:"max_retries" yaml:"max_retries"`
-	Timeout     time.Duration          `json:"timeout" yaml:"timeout"`
-	Parallel    bool                   `json:"parallel" yaml:"parallel"`
-	Interactive bool                   `json:"interactive" yaml:"interactive"`
+	MaxRetries  int           `json:"max_retries" yaml:"max_retries"`
+	Timeout     time.Duration `json:"timeout" yaml:"timeout"`
+	Parallel    bool          `json:"parallel" yaml:"parallel"`
+	Interactive bool          `json:"interactive" yaml:"interactive"`
 
 	// Provider-specific settings
 	ProviderConfig map[string]interface{} `json:"provider_config" yaml:"provider_config"`
@@ -74,15 +74,15 @@ type SubAgentConfig struct {
 	SystemPrompt   string                 `json:"system_prompt" yaml:"system_prompt"`
 
 	// Tool and MCP configuration
-	Tools       []string               `json:"tools" yaml:"tools"`
-	MCPServers  []string               `json:"mcp_servers" yaml:"mcp_servers"`
+	Tools      []string `json:"tools" yaml:"tools"`
+	MCPServers []string `json:"mcp_servers" yaml:"mcp_servers"`
 
 	// Output handling
-	OutputFormat string                 `json:"output_format" yaml:"output_format"` // json, text, markdown
-	OutputPath   string                 `json:"output_path" yaml:"output_path"`     // Where to save output
+	OutputFormat string `json:"output_format" yaml:"output_format"` // json, text, markdown
+	OutputPath   string `json:"output_path" yaml:"output_path"`     // Where to save output
 
 	// Metadata
-	Metadata    map[string]interface{} `json:"metadata" yaml:"metadata"`
+	Metadata map[string]interface{} `json:"metadata" yaml:"metadata"`
 }
 
 // SubAgentTask represents a task to be executed by a subagent
@@ -100,16 +100,16 @@ type SubAgentTask struct {
 
 // SubAgentResult represents the result of a subagent execution
 type SubAgentResult struct {
-	TaskID      string                 `json:"task_id"`
-	AgentName   string                 `json:"agent_name"`
-	Status      ExecutionStatus        `json:"status"`
-	Output      string                 `json:"output"`
-	Error       error                  `json:"error,omitempty"`
-	StartTime   time.Time              `json:"start_time"`
-	EndTime     time.Time              `json:"end_time"`
-	Duration    time.Duration          `json:"duration"`
-	Metadata    map[string]interface{} `json:"metadata"`
-	Artifacts   []SubAgentArtifact     `json:"artifacts,omitempty"`
+	TaskID    string                 `json:"task_id"`
+	AgentName string                 `json:"agent_name"`
+	Status    ExecutionStatus        `json:"status"`
+	Output    string                 `json:"output"`
+	Error     error                  `json:"error,omitempty"`
+	StartTime time.Time              `json:"start_time"`
+	EndTime   time.Time              `json:"end_time"`
+	Duration  time.Duration          `json:"duration"`
+	Metadata  map[string]interface{} `json:"metadata"`
+	Artifacts []SubAgentArtifact     `json:"artifacts,omitempty"`
 }
 
 // SubAgentArtifact represents an artifact produced by a subagent
@@ -127,12 +127,12 @@ type SubAgentArtifact struct {
 type ExecutionStatus string
 
 const (
-	StatusPending    ExecutionStatus = "pending"
-	StatusRunning    ExecutionStatus = "running"
-	StatusCompleted  ExecutionStatus = "completed"
-	StatusFailed     ExecutionStatus = "failed"
-	StatusCancelled  ExecutionStatus = "cancelled"
-	StatusTimeout    ExecutionStatus = "timeout"
+	StatusPending   ExecutionStatus = "pending"
+	StatusRunning   ExecutionStatus = "running"
+	StatusCompleted ExecutionStatus = "completed"
+	StatusFailed    ExecutionStatus = "failed"
+	StatusCancelled ExecutionStatus = "cancelled"
+	StatusTimeout   ExecutionStatus = "timeout"
 )
 
 // SubAgent defines the interface for a subagent

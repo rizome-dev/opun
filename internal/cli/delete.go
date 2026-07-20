@@ -18,6 +18,7 @@ package cli
 
 import (
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"os"
 	"path/filepath"
 	"strings"
@@ -124,12 +125,7 @@ Examples:
 // deleteWorkflow deletes a workflow from the system
 func deleteWorkflow(name string, force bool) error {
 	// Get workflow directory
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	workflowDir := filepath.Join(home, ".opun", "workflows")
+	workflowDir := filepath.Join(utils.OpunDir(), "workflows")
 	workflowPath := filepath.Join(workflowDir, name+".yaml")
 
 	// Check if workflow exists
@@ -170,7 +166,7 @@ func deleteWorkflow(name string, force bool) error {
 	// Save config
 	configPath := viper.ConfigFileUsed()
 	if configPath == "" {
-		configPath = filepath.Join(home, ".opun", "config.yaml")
+		configPath = filepath.Join(utils.OpunDir(), "config.yaml")
 	}
 
 	if err := viper.WriteConfigAs(configPath); err != nil {
@@ -185,12 +181,7 @@ func deleteWorkflow(name string, force bool) error {
 // deletePrompt deletes a prompt from the prompt garden
 func deletePrompt(name string, force bool) error {
 	// Get prompt garden
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	gardenPath := filepath.Join(home, ".opun", "promptgarden")
+	gardenPath := filepath.Join(utils.OpunDir(), "promptgarden")
 	garden, err := promptgarden.NewGarden(gardenPath)
 	if err != nil {
 		return fmt.Errorf("failed to access prompt garden: %w", err)
@@ -227,12 +218,7 @@ func deletePrompt(name string, force bool) error {
 // deleteAction deletes an action from the system
 func deleteAction(name string, force bool) error {
 	// Get actions directory
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	actionsDir := filepath.Join(home, ".opun", "actions")
+	actionsDir := filepath.Join(utils.OpunDir(), "actions")
 	actionPath := filepath.Join(actionsDir, name+".yaml")
 
 	// Check if action exists
@@ -696,12 +682,7 @@ func selectDeleteType() (string, error) {
 
 // getWorkflowDeleteItems returns all available workflows as delete items
 func getWorkflowDeleteItems() ([]deleteItem, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-
-	workflowDir := filepath.Join(home, ".opun", "workflows")
+	workflowDir := filepath.Join(utils.OpunDir(), "workflows")
 	if _, err := os.Stat(workflowDir); os.IsNotExist(err) {
 		return []deleteItem{}, nil
 	}
@@ -748,12 +729,7 @@ func getWorkflowDeleteItems() ([]deleteItem, error) {
 
 // getPromptDeleteItems returns all available prompts as delete items
 func getPromptDeleteItems() ([]deleteItem, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-
-	gardenPath := filepath.Join(home, ".opun", "promptgarden")
+	gardenPath := filepath.Join(utils.OpunDir(), "promptgarden")
 	if _, err := os.Stat(gardenPath); os.IsNotExist(err) {
 		return []deleteItem{}, nil
 	}
@@ -787,12 +763,7 @@ func getPromptDeleteItems() ([]deleteItem, error) {
 
 // getActionDeleteItems returns all available actions as delete items
 func getActionDeleteItems() ([]deleteItem, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-
-	actionsDir := filepath.Join(home, ".opun", "actions")
+	actionsDir := filepath.Join(utils.OpunDir(), "actions")
 	if _, err := os.Stat(actionsDir); os.IsNotExist(err) {
 		return []deleteItem{}, nil
 	}

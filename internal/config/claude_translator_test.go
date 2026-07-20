@@ -18,7 +18,7 @@ package config
 
 import (
 	"os"
-	"strings"
+	"path/filepath"
 	"testing"
 
 	"github.com/rizome-dev/opun/pkg/core"
@@ -29,9 +29,7 @@ import (
 func TestClaudeConfigTranslator_TranslateMCPConfig(t *testing.T) {
 	// Set test home directory
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tempDir)
 
 	translator := NewClaudeConfigTranslator()
 
@@ -62,7 +60,7 @@ func TestClaudeConfigTranslator_TranslateMCPConfig(t *testing.T) {
 	config, err := translator.TranslateMCPConfig(servers)
 	require.NoError(t, err)
 
-	claudeConfig, ok := config.(ClaudeDesktopConfig)
+	claudeConfig, ok := config.(ClaudeConfig)
 	require.True(t, ok)
 
 	// Check mcpServers - only installed or required servers are included
@@ -87,21 +85,7 @@ func TestClaudeConfigTranslator_TranslateMCPConfig(t *testing.T) {
 func TestClaudeConfigTranslator_GetConfigPath(t *testing.T) {
 	translator := NewClaudeConfigTranslator()
 	path := translator.GetConfigPath()
-	// Path will be expanded, so check it contains the expected path components
-	// On macOS, it could be either the primary location or the fallback XDG location
-	validPaths := []string{
-		"Library/Application Support/Claude/claude_desktop_config.json",
-		".config/claude/claude_desktop_config.json",
-	}
-
-	validPath := false
-	for _, expectedPath := range validPaths {
-		if strings.Contains(path, expectedPath) {
-			validPath = true
-			break
-		}
-	}
-	assert.True(t, validPath, "Path should contain one of the valid Claude config paths, got: %s", path)
+	assert.Equal(t, filepath.Join(os.Getenv("HOME"), ".claude.json"), path)
 }
 
 func TestClaudeConfigTranslator_TranslateSlashCommands(t *testing.T) {

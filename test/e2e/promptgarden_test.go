@@ -1,3 +1,5 @@
+//go:build e2e
+
 package e2e
 
 // Copyright (C) 2025 Rizome Labs, Inc.

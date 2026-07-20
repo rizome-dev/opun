@@ -19,6 +19,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -64,13 +65,8 @@ func mcpServeCmd() *cobra.Command {
 This server can be used by Claude, Gemini, and other MCP-compatible clients.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Initialize components
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return err
-			}
-
 			// Initialize prompt garden
-			gardenPath := filepath.Join(home, ".opun", "promptgarden")
+			gardenPath := filepath.Join(utils.OpunDir(), "promptgarden")
 			garden, err := promptgarden.NewGarden(gardenPath)
 			if err != nil {
 				return fmt.Errorf("failed to initialize prompt garden: %w", err)
@@ -80,7 +76,7 @@ This server can be used by Claude, Gemini, and other MCP-compatible clients.`,
 			registry := command.NewRegistry()
 
 			// Initialize plugin manager
-			pluginPath := filepath.Join(home, ".opun", "plugins")
+			pluginPath := filepath.Join(utils.OpunDir(), "plugins")
 			manager := plugin.NewManager(pluginPath)
 
 			// Create unified server
@@ -133,13 +129,8 @@ To use with Gemini, add this to ~/.gemini/settings.json:
 			// Set environment variable to suppress warnings that could interfere with JSON-RPC
 			os.Setenv("OPUN_MCP_STDIO", "1")
 			// Initialize components
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return err
-			}
-
 			// Initialize prompt garden
-			gardenPath := filepath.Join(home, ".opun", "promptgarden")
+			gardenPath := filepath.Join(utils.OpunDir(), "promptgarden")
 			garden, err := promptgarden.NewGarden(gardenPath)
 			if err != nil {
 				// Suppress warnings in stdio mode - they interfere with JSON-RPC protocol
@@ -150,11 +141,11 @@ To use with Gemini, add this to ~/.gemini/settings.json:
 			registry := command.NewRegistry()
 
 			// Initialize plugin manager
-			pluginPath := filepath.Join(home, ".opun", "plugins")
+			pluginPath := filepath.Join(utils.OpunDir(), "plugins")
 			manager := plugin.NewManager(pluginPath)
 
 			// Initialize workflow manager
-			workflowPath := filepath.Join(home, ".opun", "workflows")
+			workflowPath := filepath.Join(utils.OpunDir(), "workflows")
 			workflowMgr, err := workflow.NewManager(workflowPath)
 			if err != nil {
 				// Suppress warnings in stdio mode - they interfere with JSON-RPC protocol
@@ -162,7 +153,7 @@ To use with Gemini, add this to ~/.gemini/settings.json:
 			}
 
 			// Initialize tool registry
-			toolsPath := filepath.Join(home, ".opun", "tools")
+			toolsPath := filepath.Join(utils.OpunDir(), "tools")
 			toolLoader := tools.NewLoader(toolsPath)
 			if err := toolLoader.LoadAll(); err != nil {
 				// Suppress warnings in stdio mode - they interfere with JSON-RPC protocol
@@ -171,7 +162,7 @@ To use with Gemini, add this to ~/.gemini/settings.json:
 			toolRegistry := toolLoader.GetRegistry()
 
 			// Create stdio server
-			server := mcp.NewStdioMCPServer(garden, registry, manager, workflowMgr, toolRegistry)
+			server := mcp.NewStdioMCPServer(garden, registry, manager, workflowMgr, toolRegistry, GetSubAgentManager())
 
 			// Setup signal handling
 			ctx, cancel := context.WithCancel(context.Background())

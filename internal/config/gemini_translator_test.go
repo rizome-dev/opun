@@ -29,9 +29,7 @@ import (
 func TestGeminiConfigTranslator_TranslateMCPConfig(t *testing.T) {
 	// Set test home directory
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tempDir)
 
 	translator := NewGeminiConfigTranslator()
 

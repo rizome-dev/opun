@@ -98,19 +98,11 @@ func TestQwenProvider_SupportsModel(t *testing.T) {
 
 	provider := NewQwenProvider(config)
 
-	// Test supported models
-	assert.True(t, provider.SupportsModel("code"))
-	assert.True(t, provider.SupportsModel("pro"))
-	assert.True(t, provider.SupportsModel("flash"))
-	assert.True(t, provider.SupportsModel("ultra"))
-	assert.True(t, provider.SupportsModel("chat"))
+	// Model IDs are passed through to the CLI, which validates them itself
+	assert.True(t, provider.SupportsModel("qwen3-coder-plus"))
+	assert.True(t, provider.SupportsModel("qwen3-max"))
 
-	// Test case insensitive
-	assert.True(t, provider.SupportsModel("CODE"))
-	assert.True(t, provider.SupportsModel("Chat"))
-
-	// Test unsupported model
-	assert.False(t, provider.SupportsModel("unsupported"))
+	assert.False(t, provider.SupportsModel(""))
 }
 
 func TestQwenProvider_GetMCPServers(t *testing.T) {
@@ -227,4 +219,3 @@ func TestQwenProvider_GetPTYCommand(t *testing.T) {
 	}
 	assert.True(t, envFound, "TEST_VAR environment variable not found")
 }
-

@@ -18,6 +18,7 @@ package cli
 
 import (
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"os"
 	"path/filepath"
 	"strings"
@@ -123,12 +124,7 @@ func init() {
 }
 
 func listActions(provider, category string) error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	actionsDir := filepath.Join(homeDir, ".opun", "actions")
+	actionsDir := filepath.Join(utils.OpunDir(), "actions")
 	loader := tools.NewLoader(actionsDir)
 
 	if err := loader.LoadAll(); err != nil {
@@ -186,12 +182,7 @@ func addAction(name, description, category, command, workflow, prompt string) er
 		return fmt.Errorf("must specify one of: --command, --workflow, or --prompt")
 	}
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	actionsDir := filepath.Join(homeDir, ".opun", "actions")
+	actionsDir := filepath.Join(utils.OpunDir(), "actions")
 	loader := tools.NewLoader(actionsDir)
 
 	// Create action
@@ -216,12 +207,7 @@ func addAction(name, description, category, command, workflow, prompt string) er
 }
 
 func removeAction(actionID string) error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	actionsDir := filepath.Join(homeDir, ".opun", "actions")
+	actionsDir := filepath.Join(utils.OpunDir(), "actions")
 	loader := tools.NewLoader(actionsDir)
 
 	if err := loader.DeleteAction(actionID); err != nil {
@@ -233,12 +219,7 @@ func removeAction(actionID string) error {
 }
 
 func runAction(actionID, args string) error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	actionsDir := filepath.Join(homeDir, ".opun", "actions")
+	actionsDir := filepath.Join(utils.OpunDir(), "actions")
 	loader := tools.NewLoader(actionsDir)
 
 	if err := loader.LoadAll(); err != nil {

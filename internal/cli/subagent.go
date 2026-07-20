@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,7 +43,7 @@ var (
 func InitSubAgentManager() error {
 	if globalSubAgentManager == nil {
 		globalSubAgentManager = subagentpkg.NewManager()
-		
+
 		// Load subagent configurations from disk
 		if err := loadSubAgentConfigs(); err != nil {
 			return fmt.Errorf("failed to load subagent configs: %w", err)
@@ -110,7 +111,7 @@ func subAgentListCmd() *cobra.Command {
 				if caps == "" {
 					caps = "none"
 				}
-				
+
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 					agent.Name(),
 					agent.Provider(),
@@ -310,7 +311,7 @@ or loaded from a file using the --input flag.`,
 
 			// Get manager and execute
 			mgr := GetSubAgentManager()
-			
+
 			// Create context with timeout
 			ctx := cmd.Context()
 			if timeout > 0 {
@@ -320,7 +321,7 @@ or loaded from a file using the --input flag.`,
 			}
 
 			fmt.Printf("🚀 Executing task on subagent '%s'...\n", name)
-			
+
 			result, err := mgr.Execute(ctx, task, name)
 			if err != nil {
 				return fmt.Errorf("task execution failed: %w", err)
@@ -330,10 +331,10 @@ or loaded from a file using the --input flag.`,
 			fmt.Printf("\n📊 Task Result:\n")
 			fmt.Printf("Status: %s\n", result.Status)
 			fmt.Printf("Duration: %s\n", result.EndTime.Sub(result.StartTime))
-			
+
 			if result.Output != "" {
 				fmt.Printf("\n📝 Output:\n%s\n", result.Output)
-				
+
 				// Save to file if requested
 				if outputFile != "" {
 					if err := os.WriteFile(outputFile, []byte(result.Output), 0644); err != nil {
@@ -381,13 +382,13 @@ func subAgentInfoCmd() *cobra.Command {
 
 			fmt.Printf("📋 Subagent Information\n")
 			fmt.Printf("=======================\n\n")
-			
+
 			fmt.Printf("Name:        %s\n", agent.Name())
 			fmt.Printf("Provider:    %s\n", agent.Provider())
 			fmt.Printf("Model:       %s\n", config.Model)
 			fmt.Printf("Status:      %s\n", agent.Status())
 			fmt.Printf("Strategy:    %s\n", config.Strategy)
-			
+
 			if len(agent.GetCapabilities()) > 0 {
 				fmt.Printf("\n🎯 Capabilities:\n")
 				for _, cap := range agent.GetCapabilities() {
@@ -424,13 +425,8 @@ func subAgentInfoCmd() *cobra.Command {
 // Helper functions for configuration management
 
 func loadSubAgentConfigs() error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
+	configDir := filepath.Join(utils.OpunDir(), "subagents")
 
-	configDir := filepath.Join(home, ".opun", "subagents")
-	
 	// Create directory if it doesn't exist
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return err
@@ -449,9 +445,9 @@ func loadSubAgentConfigs() error {
 		}
 
 		// Only process YAML and JSON files
-		if !strings.HasSuffix(entry.Name(), ".yaml") && 
-		   !strings.HasSuffix(entry.Name(), ".yml") && 
-		   !strings.HasSuffix(entry.Name(), ".json") {
+		if !strings.HasSuffix(entry.Name(), ".yaml") &&
+			!strings.HasSuffix(entry.Name(), ".yml") &&
+			!strings.HasSuffix(entry.Name(), ".json") {
 			continue
 		}
 
@@ -490,18 +486,13 @@ func loadSubAgentConfigs() error {
 }
 
 func saveSubAgentConfig(config core.SubAgentConfig) error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	configDir := filepath.Join(home, ".opun", "subagents")
+	configDir := filepath.Join(utils.OpunDir(), "subagents")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return err
 	}
 
 	configFile := filepath.Join(configDir, fmt.Sprintf("%s.yaml", config.Name))
-	
+
 	data, err := yaml.Marshal(config)
 	if err != nil {
 		return err
@@ -511,13 +502,8 @@ func saveSubAgentConfig(config core.SubAgentConfig) error {
 }
 
 func deleteSubAgentConfig(name string) error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
+	configDir := filepath.Join(utils.OpunDir(), "subagents")
 
-	configDir := filepath.Join(home, ".opun", "subagents")
-	
 	// Try different extensions
 	for _, ext := range []string{".yaml", ".yml", ".json"} {
 		configFile := filepath.Join(configDir, name+ext)

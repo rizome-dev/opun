@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"io"
 	"os"
 	"path/filepath"
@@ -43,12 +44,13 @@ type StdioMCPServer struct {
 	workflowMgr  *workflow.Manager
 	toolRegistry *toolslib.Registry
 	toolExecutor *ToolExecutor
+	subAgents    core.SubAgentManager
 	reader       *bufio.Reader
 	writer       io.Writer
 }
 
 // NewStdioMCPServer creates a new stdio-based MCP server
-func NewStdioMCPServer(garden *promptgarden.Garden, registry *command.Registry, pluginMgr *plugin.Manager, workflowMgr *workflow.Manager, toolRegistry *toolslib.Registry) *StdioMCPServer {
+func NewStdioMCPServer(garden *promptgarden.Garden, registry *command.Registry, pluginMgr *plugin.Manager, workflowMgr *workflow.Manager, toolRegistry *toolslib.Registry, subAgents core.SubAgentManager) *StdioMCPServer {
 	// Get working directory for tool executor
 	workDir, _ := os.Getwd()
 
@@ -59,6 +61,7 @@ func NewStdioMCPServer(garden *promptgarden.Garden, registry *command.Registry, 
 		workflowMgr:  workflowMgr,
 		toolRegistry: toolRegistry,
 		toolExecutor: NewToolExecutor(workDir),
+		subAgents:    subAgents,
 		reader:       bufio.NewReader(os.Stdin),
 		writer:       os.Stdout,
 	}
@@ -110,7 +113,6 @@ func (s *StdioMCPServer) readRequest() (map[string]interface{}, error) {
 		return nil, io.EOF
 	}
 
-
 	var request map[string]interface{}
 	if err := json.Unmarshal([]byte(line), &request); err != nil {
 		// Don't send parse error for empty JSON objects or arrays
@@ -132,7 +134,7 @@ func (s *StdioMCPServer) sendResponse(id interface{}, result interface{}) {
 	if id == nil {
 		return
 	}
-	
+
 	response := map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      id,
@@ -140,8 +142,7 @@ func (s *StdioMCPServer) sendResponse(id interface{}, result interface{}) {
 	}
 
 	data, _ := json.Marshal(response)
-	
-	
+
 	fmt.Fprintf(s.writer, "%s\n", data)
 	// Ensure output is flushed immediately
 	if f, ok := s.writer.(*os.File); ok {
@@ -155,7 +156,7 @@ func (s *StdioMCPServer) sendError(id interface{}, err error) {
 	if id == nil {
 		return
 	}
-	
+
 	response := map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      id,
@@ -166,8 +167,7 @@ func (s *StdioMCPServer) sendError(id interface{}, err error) {
 	}
 
 	data, _ := json.Marshal(response)
-	
-	
+
 	fmt.Fprintf(s.writer, "%s\n", data)
 	// Ensure output is flushed immediately
 	if f, ok := s.writer.(*os.File); ok {
@@ -200,7 +200,6 @@ func (s *StdioMCPServer) handleRequest(request map[string]interface{}) {
 	method, _ := request["method"].(string)
 	id := request["id"]
 	params, _ := request["params"].(map[string]interface{})
-
 
 	// If there's no id, this is a notification and we shouldn't respond
 	isNotification := id == nil
@@ -274,6 +273,40 @@ func (s *StdioMCPServer) createToolDescriptor(name, description, source, version
 // handleToolsList returns all available tools
 func (s *StdioMCPServer) handleToolsList(id interface{}) {
 	tools := []map[string]interface{}{}
+
+	// Add cross-provider subagent tools
+	if s.subAgents != nil {
+		tools = append(tools, s.createToolDescriptor(
+			"subagent_execute",
+			"[SubAgent] Delegate a task to a named subagent (cross-provider)",
+			"subagent",
+			"1.0.0",
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"agent": map[string]interface{}{
+						"type":        "string",
+						"description": "Name of the subagent to execute; empty to auto-select by capability",
+					},
+					"task": map[string]interface{}{
+						"type":        "string",
+						"description": "Task description or prompt for the subagent",
+					},
+				},
+				"required": []string{"task"},
+			},
+		))
+		tools = append(tools, s.createToolDescriptor(
+			"subagent_list",
+			"[SubAgent] List registered subagents and their capabilities",
+			"subagent",
+			"1.0.0",
+			map[string]interface{}{
+				"type":       "object",
+				"properties": map[string]interface{}{},
+			},
+		))
+	}
 
 	// Add workflow tools
 	if s.workflowMgr != nil {
@@ -364,8 +397,7 @@ func (s *StdioMCPServer) handleToolsList(id interface{}) {
 	}
 
 	// Add MCP tools from ~/.opun/tools
-	home, _ := os.UserHomeDir()
-	toolsDir := filepath.Join(home, ".opun", "tools")
+	toolsDir := filepath.Join(utils.OpunDir(), "tools")
 	if entries, err := os.ReadDir(toolsDir); err == nil {
 		for _, entry := range entries {
 			if !entry.IsDir() && (strings.HasSuffix(entry.Name(), ".yaml") || strings.HasSuffix(entry.Name(), ".yml")) {
@@ -439,6 +471,8 @@ func (s *StdioMCPServer) handleToolCall(id interface{}, params map[string]interf
 		result, err = s.executeStandardAction(toolName, arguments)
 	case strings.HasPrefix(toolName, "tool_"):
 		result, err = s.executeMCPTool(toolName, arguments)
+	case strings.HasPrefix(toolName, "subagent_"):
+		result, err = s.executeSubAgentTool(toolName, arguments)
 	default:
 		err = fmt.Errorf("unknown tool: %s", toolName)
 	}
@@ -548,8 +582,7 @@ func (s *StdioMCPServer) executeMCPTool(tool string, args map[string]interface{}
 	toolName := strings.TrimPrefix(tool, "tool_")
 
 	// Load tool definition
-	home, _ := os.UserHomeDir()
-	toolsDir := filepath.Join(home, ".opun", "tools")
+	toolsDir := filepath.Join(utils.OpunDir(), "tools")
 	toolPath := filepath.Join(toolsDir, toolName+".yaml")
 
 	// Try .yml if .yaml doesn't exist
@@ -621,6 +654,62 @@ func (s *StdioMCPServer) executeMCPTool(tool string, args map[string]interface{}
 }
 
 // executeStandardAction executes an action from the action registry
+// executeSubAgentTool handles cross-provider subagent delegation tools
+func (s *StdioMCPServer) executeSubAgentTool(toolName string, args map[string]interface{}) (string, error) {
+	if s.subAgents == nil {
+		return "", fmt.Errorf("subagent manager not available")
+	}
+
+	switch toolName {
+	case "subagent_list":
+		agents := s.subAgents.List()
+		if len(agents) == 0 {
+			return "No subagents registered. Create one with 'opun subagent create'.", nil
+		}
+		var sb strings.Builder
+		for _, agent := range agents {
+			cfg := agent.Config()
+			sb.WriteString(fmt.Sprintf("- %s (%s): %s [capabilities: %s]\n",
+				cfg.Name, cfg.Provider, cfg.Description, strings.Join(agent.GetCapabilities(), ", ")))
+		}
+		return sb.String(), nil
+
+	case "subagent_execute":
+		taskInput, _ := args["task"].(string)
+		if taskInput == "" {
+			return "", fmt.Errorf("task is required")
+		}
+		agentName, _ := args["agent"].(string)
+
+		task := core.SubAgentTask{
+			ID:          fmt.Sprintf("mcp-%d", os.Getpid()),
+			Name:        "MCP delegated task",
+			Description: taskInput,
+			Input:       taskInput,
+			Context:     map[string]interface{}{},
+		}
+
+		ctx := context.Background()
+		var result *core.SubAgentResult
+		var err error
+		if agentName != "" {
+			result, err = s.subAgents.Execute(ctx, task, agentName)
+		} else {
+			result, err = s.subAgents.Delegate(ctx, task)
+		}
+		if err != nil {
+			return "", fmt.Errorf("subagent execution failed: %w", err)
+		}
+		if result.Error != nil {
+			return "", result.Error
+		}
+		return result.Output, nil
+
+	default:
+		return "", fmt.Errorf("unknown subagent tool: %s", toolName)
+	}
+}
+
 func (s *StdioMCPServer) executeStandardAction(toolName string, args map[string]interface{}) (string, error) {
 	if s.toolRegistry == nil {
 		return "", fmt.Errorf("action registry not available")

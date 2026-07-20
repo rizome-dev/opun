@@ -19,6 +19,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -159,12 +160,7 @@ func loadWorkflow(name string) (*wf.Workflow, error) {
 		}
 	} else {
 		// Load from workflows directory
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, err
-		}
-
-		workflowPath := filepath.Join(home, ".opun", "workflows", name+".yaml")
+		workflowPath := filepath.Join(utils.OpunDir(), "workflows", name+".yaml")
 		data, err = os.ReadFile(workflowPath)
 		if err != nil {
 			return nil, fmt.Errorf("workflow '%s' not found", name)
@@ -172,8 +168,7 @@ func loadWorkflow(name string) (*wf.Workflow, error) {
 	}
 
 	// Parse workflow
-	home, _ := os.UserHomeDir()
-	workflowDir := filepath.Join(home, ".opun", "workflows")
+	workflowDir := filepath.Join(utils.OpunDir(), "workflows")
 	parser := workflow.NewParser(workflowDir)
 	return parser.Parse(data)
 }
@@ -305,12 +300,7 @@ func selectWorkflowInteractively() (string, error) {
 
 // getAvailableWorkflows returns all available workflows
 func getAvailableWorkflows() ([]workflowItem, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-
-	workflowDir := filepath.Join(home, ".opun", "workflows")
+	workflowDir := filepath.Join(utils.OpunDir(), "workflows")
 	if _, err := os.Stat(workflowDir); os.IsNotExist(err) {
 		return []workflowItem{}, nil
 	}

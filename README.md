@@ -53,7 +53,21 @@ opun subagent list                          # List all registered subagents
 opun subagent create config.yaml            # Create from configuration
 opun subagent execute agent-name "task"     # Execute task on specific agent
 opun subagent info agent-name               # Show agent details
+
+# Actions - lightweight command wrappers exposed to agents
+opun action list                            # List available actions
+opun action run <name>                      # Run an action
+
+# Other commands
+opun refactor                               # Run the code refactoring workflow
+opun capability list                        # List provider capabilities
+opun mcp stdio                              # Run opun's MCP server (used by providers)
+opun completion <shell>                     # Generate shell completions
 ```
+
+Workflow agents run through each provider's headless mode (`claude -p`, `gemini -p`, `qwen -p`) by default; set `interactive: true` in an agent's settings to watch it run in a PTY session instead. Set `OPUN_HOME` to relocate opun's data directory (defaults to `~/.opun`).
+
+> **Qwen auth note**: Qwen's OAuth free tier was discontinued in April 2026. Configure Qwen with `OPENAI_API_KEY`/`OPENAI_BASE_URL` (DashScope-compatible mode) or an Alibaba Cloud Coding Plan key (`BAILIAN_CODING_PLAN_API_KEY`) before using qwen agents.
 
 ## Configuration
 
@@ -719,10 +733,7 @@ Please explain the following code for a {{audience_level}} developer:
 
 ```bash
 # List available prompts
-opun list prompts
-
-# Use in chat with variables
-opun prompt code-explanation --code_snippet="function fibonacci(n) { ... }"
+opun list --prompts
 
 # Reference in workflows
 agents:

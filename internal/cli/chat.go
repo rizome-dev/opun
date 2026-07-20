@@ -20,6 +20,7 @@ package cli
 
 import (
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"io"
 	"os"
 	"os/exec"
@@ -40,12 +41,7 @@ func runChat(cmd *cobra.Command, provider string, providerArgs []string) error {
 	provider = strings.ToLower(provider)
 
 	// Load actions from the actions directory
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	actionsDir := filepath.Join(homeDir, ".opun", "actions")
+	actionsDir := filepath.Join(utils.OpunDir(), "actions")
 	actionLoader := tools.NewLoader(actionsDir)
 
 	// Load all actions

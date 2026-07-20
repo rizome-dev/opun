@@ -18,6 +18,7 @@ package cli
 
 import (
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"os"
 	"path/filepath"
 	"strings"
@@ -83,12 +84,7 @@ func init() {
 }
 
 func listCapabilities(capType, provider string) error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	opunDir := filepath.Join(homeDir, ".opun")
+	opunDir := utils.OpunDir()
 
 	// Create output table
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
@@ -221,12 +217,7 @@ func listCapabilities(capType, provider string) error {
 }
 
 func searchCapabilities(query, capType string) error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	opunDir := filepath.Join(homeDir, ".opun")
+	opunDir := utils.OpunDir()
 	queryLower := strings.ToLower(query)
 
 	// Create output table

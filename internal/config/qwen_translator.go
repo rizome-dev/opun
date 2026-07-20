@@ -103,7 +103,7 @@ func (q *QwenConfigTranslator) TranslateSlashCommands(commands []core.SharedSlas
 func (q *QwenConfigTranslator) GetConfigPath() string {
 	homeDir, _ := os.UserHomeDir()
 
-	// Since Qwen is a fork of Gemini, it likely uses ~/.qwen/settings.json
+	// Qwen Code reads MCP servers from ~/.qwen/settings.json
 	return filepath.Join(homeDir, ".qwen", "settings.json")
 }
 
@@ -112,4 +112,3 @@ func (q *QwenConfigTranslator) SupportsSymlinks() bool {
 	// Assume Qwen can handle symlinks for now
 	return true
 }
-

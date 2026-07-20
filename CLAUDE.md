@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Opun is a Go-based Terminal Development Kit (TDK) that provides a standardized framework for managing AI code agents. It orchestrates Claude Code, Gemini CLI, and Qwen Code through PTY automation, offering workflow automation, cross-provider subagent orchestration, multi-agent coordination, and extensibility through plugins and MCP servers.
+Opun is a Go-based Terminal Development Kit (TDK) that provides a standardized framework for managing AI code agents. It orchestrates Claude Code, Gemini CLI, and Qwen Code through their headless CLI modes (with optional interactive PTY sessions), offering workflow automation, cross-provider subagent orchestration, multi-agent coordination, and extensibility through plugins and MCP servers.
 
 ## Essential Commands
 
@@ -51,15 +51,15 @@ make fix-permissions   # Fix ownership of ~/.opun directory
 ## Architecture Overview
 
 ### Provider Abstraction
-The system uses PTY automation to control AI providers:
+The system drives AI providers via their headless CLI modes:
+- `internal/headless/` - Headless runners (`claude -p`, `gemini -p`, `qwen -p` with `--output-format json`) and per-provider JSON result parsers
 - `pkg/core/provider.go` - Core Provider interface
-- `internal/providers/` - Claude and Gemini implementations
+- `internal/providers/` - Claude, Gemini, and Qwen implementations
 - Provider creation: `internal/providers/factory.go`
-- PTY management: `internal/pty/` (session control and automation)
 
 ### Key Architecture Patterns
-- **PTY Automation**: Terminal session management for provider interaction
-- **Session Isolation**: Each workflow gets its own session directory
+- **Headless Execution**: Workflow agents and subagents run through provider print modes with JSON output; no terminal scraping
+- **Interactive PTY (opt-in)**: `opun chat` is a transparent PTY passthrough; workflow agents with `interactive: true` run in a visible PTY session (unix only)
 - **Workflow Engine**: YAML-based sequential/parallel agent orchestration
 - **Subagent System**: Cross-provider task delegation and specialization
 - **Plugin System**: Extensible via Go plugins, scripts, or JSON definitions
@@ -139,36 +139,33 @@ agents:
 ### Important Implementation Details
 
 #### Provider Detection
-- Claude: Tries `claude` command, falls back to `npx claude-code`
-- Gemini: Direct command execution
-- Qwen: Tries `qwen` command
-- Ready patterns are provider-specific (e.g., Claude: "Type /help")
+- Providers resolve to their binary on PATH (`claude`, `gemini`, `qwen`); a `Command` override in provider config is honored
+- Headless runs pipe the prompt via stdin and parse JSON output (schemas differ per provider: Claude/Qwen emit result objects/arrays, Gemini emits `{response, stats}`)
+- Interactive ready detection: Claude uses the `│ >` input-box family; Gemini/Qwen match the "Type your message" placeholder after ANSI stripping
 
-#### Prompt Injection Methods
-- **Clipboard**: Used by Claude (simulates Cmd+V)
-- **File**: Write to temp file and reference
-- **Stdin**: Direct pipe to provider
+#### Execution Modes
+- **Headless (default)**: `claude -p` / `gemini -p` / `qwen -p` with `--output-format json`; the executor writes agent output files itself
+- **Interactive** (`interactive: true` per agent, unix only): PTY session with typed prompt injection
+- Permission modes map per provider: `auto-edit` → Claude `acceptEdits` / Gemini `auto_edit` / Qwen `auto-edit`; `yolo` → Claude `bypassPermissions`
 
 #### Error Handling
-- `InteractiveModeRequiredError` - Triggers interactive mode for auth
 - Workflows support `continue_on_error` and `stop_on_error`
-- PTY sessions handle provider crashes gracefully
+- Headless runs enforce a per-step timeout (default 10m, `settings.timeout` per agent)
 
 ### Project Structure
 ```
 cmd/opun/          # CLI entry point (uses Charm's fang)
 internal/
-  cli/             # Cobra commands (add, chat, list, prompt, refactor, run, setup, subagent)
+  cli/             # Cobra commands (add, update, delete, list, chat, run, refactor, capability, subagent, setup, mcp, action, completion)
   command/         # Command execution and registry
-  io/              # Session management (managed and transparent)
-  mcp/             # MCP (Model Context Protocol) integration  
+  headless/        # Headless provider runners and JSON result parsing
+  mcp/             # MCP (Model Context Protocol) integration
   plugin/          # Plugin loading and management
   promptgarden/    # Prompt storage and templating
   providers/       # AI provider implementations (claude, gemini, qwen)
-  pty/             # PTY automation and provider-specific handling
   subagent/        # Subagent implementation and management
   workflow/        # YAML-based workflow engine
-  utils/           # Utilities (clipboard operations)
+  utils/           # Utilities (clipboard, opun dir resolution)
 pkg/               # Public interfaces
   command/         # Command types
   core/            # Core interfaces (Provider, Tool, MCP, Prompt, SubAgent)
@@ -200,13 +197,12 @@ pkg/               # Public interfaces
 
 ### Key Implementation Notes
 - **NEVER create duplicate files with suffixes like `_enhanced`, `_new`, `_v2`** - Always modify original files
-- The architecture is moving from API-based to PTY-based automation
-- Each workflow execution creates an isolated session
-- PTY sessions are reused within a workflow for efficiency
-- Clipboard integration is critical for Claude prompt injection
+- Workflow agents and subagents execute through `internal/headless` (provider print modes); PTY is reserved for `opun chat` and opt-in interactive agents
+- `OPUN_HOME` overrides the data directory (default `~/.opun`); all path resolution flows through `utils.OpunDir()`
+- MCP server config is synced to each CLI's real config file: `~/.claude.json`, `~/.gemini/settings.json`, `~/.qwen/settings.json` (merged, preserving unmanaged entries); MCP servers run on demand via `npx -y`
 - Provider configurations support MCP servers and tools
-- Subagents enable cross-provider orchestration with capability-based routing
-- MCP Task server integration provides advanced tool capabilities
+- Subagents enable cross-provider orchestration with capability-based routing (`core.MatchesCapabilities`)
+- The opun MCP stdio server exposes `subagent_execute`/`subagent_list` tools for cross-provider delegation
 
 ## Subagent Development
 
@@ -221,7 +217,7 @@ import "github.com/rizome-dev/opun/internal/subagent"
 config := core.SubAgentConfig{
     Name:         "my-agent",
     Provider:     core.ProviderTypeClaude,
-    Model:        "claude-3-sonnet",
+    Model:        "sonnet",
     Capabilities: []string{"code-review", "security"},
     SystemPrompt: "You are an expert reviewer...",
 }

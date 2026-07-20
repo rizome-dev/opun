@@ -393,6 +393,11 @@ providers-check: ## Check if AI providers are installed
 	else \
 		echo "$(COLOR_YELLOW)✗ Gemini CLI not found$(COLOR_RESET)"; \
 	fi
+	@if command -v qwen >/dev/null 2>&1; then \
+		echo "$(COLOR_GREEN)✓ Qwen CLI installed$(COLOR_RESET)"; \
+	else \
+		echo "$(COLOR_YELLOW)✗ Qwen CLI not found$(COLOR_RESET)"; \
+	fi
 
 .PHONY: check-setup
 check-setup: ## Check if Opun is properly configured

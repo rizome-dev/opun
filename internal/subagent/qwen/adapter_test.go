@@ -29,15 +29,15 @@ import (
 
 func TestQwenAdapter_Creation(t *testing.T) {
 	config := core.SubAgentConfig{
-		Name:        "qwen-test-agent",
-		Type:        core.SubAgentTypeWorkflow,
-		Provider:    core.ProviderTypeQwen,
-		Model:       "code",
-		Description: "Test Qwen agent",
+		Name:         "qwen-test-agent",
+		Type:         core.SubAgentTypeWorkflow,
+		Provider:     core.ProviderTypeQwen,
+		Model:        "code",
+		Description:  "Test Qwen agent",
 		Capabilities: []string{"code", "debugging", "optimization"},
-		Strategy:    core.DelegationExplicit,
-		MaxRetries:  1,
-		Timeout:     time.Minute * 2,
+		Strategy:     core.DelegationExplicit,
+		MaxRetries:   1,
+		Timeout:      time.Minute * 2,
 	}
 
 	adapter := NewQwenAdapter(config)
@@ -55,9 +55,9 @@ func TestQwenAdapter_Initialize(t *testing.T) {
 
 	t.Run("Initialize with valid config", func(t *testing.T) {
 		config := core.SubAgentConfig{
-			Name:        "initialized-qwen",
-			Provider:    core.ProviderTypeQwen,
-			Model:       "code",
+			Name:         "initialized-qwen",
+			Provider:     core.ProviderTypeQwen,
+			Model:        "code",
 			Capabilities: []string{"code", "testing"},
 		}
 
@@ -120,8 +120,8 @@ func TestQwenAdapter_TaskAdaptation(t *testing.T) {
 
 	t.Run("Adapt debugging task", func(t *testing.T) {
 		task := core.SubAgentTask{
-			ID:   "debug-task",
-			Name: "Debug Code",
+			ID:    "debug-task",
+			Name:  "Debug Code",
 			Input: "def func():\n  print('hello'\n", // Intentional syntax error
 			Context: map[string]interface{}{
 				"task_type": "debugging",
@@ -232,7 +232,7 @@ func TestQwenAdapter_WorkflowIntegration(t *testing.T) {
 
 		adapted, err := adapter.AdaptTask(task)
 		require.NoError(t, err)
-		
+
 		// Verify workflow configuration
 		if workflowConfig, ok := adapted.(map[string]interface{}); ok {
 			assert.NotNil(t, workflowConfig)
@@ -266,7 +266,7 @@ func TestQwenAdapter_CodeSpecificFeatures(t *testing.T) {
 
 	t.Run("Handle multiple languages", func(t *testing.T) {
 		languages := []string{"python", "javascript", "go", "rust"}
-		
+
 		for _, lang := range languages {
 			task := core.SubAgentTask{
 				ID: lang + "-task",
@@ -274,7 +274,7 @@ func TestQwenAdapter_CodeSpecificFeatures(t *testing.T) {
 					"language": lang,
 				},
 			}
-			
+
 			adapted, err := adapter.AdaptTask(task)
 			assert.NoError(t, err)
 			assert.NotNil(t, adapted)
@@ -346,7 +346,7 @@ func TestQwenAdapter_Capabilities(t *testing.T) {
 	t.Run("Supports parallel execution", func(t *testing.T) {
 		adapter.config.Parallel = false // Qwen might be sequential by default
 		assert.False(t, adapter.SupportsParallel())
-		
+
 		adapter.config.Parallel = true
 		assert.True(t, adapter.SupportsParallel())
 	})
@@ -410,7 +410,7 @@ func TestQwenAdapter_StatusAndControl(t *testing.T) {
 		adapter.config.Model = "code"
 		err := adapter.Validate()
 		assert.NoError(t, err)
-		
+
 		// Invalid model for Qwen
 		adapter.config.Model = "image"
 		err = adapter.Validate()
@@ -418,7 +418,7 @@ func TestQwenAdapter_StatusAndControl(t *testing.T) {
 		if err != nil {
 			assert.Contains(t, err.Error(), "model")
 		}
-		
+
 		// Reset
 		adapter.config.Model = "code"
 	})
@@ -489,29 +489,35 @@ type MockQwenProvider struct {
 	typ  core.ProviderType
 }
 
-func (m *MockQwenProvider) Name() string                                       { return m.name }
-func (m *MockQwenProvider) Type() core.ProviderType                            { return m.typ }
-func (m *MockQwenProvider) Initialize(config core.ProviderConfig) error        { return nil }
-func (m *MockQwenProvider) Validate() error                                    { return nil }
-func (m *MockQwenProvider) GetPTYCommand() (*exec.Cmd, error)                  { return exec.Command("echo"), nil }
-func (m *MockQwenProvider) GetPTYCommandWithPrompt(prompt string) (*exec.Cmd, error) { return exec.Command("echo", prompt), nil }
-func (m *MockQwenProvider) Features() core.ProviderFeatures                    { return core.ProviderFeatures{} }
-func (m *MockQwenProvider) SupportsModel(model string) bool                    { return true }
+func (m *MockQwenProvider) Name() string                                { return m.name }
+func (m *MockQwenProvider) Type() core.ProviderType                     { return m.typ }
+func (m *MockQwenProvider) Initialize(config core.ProviderConfig) error { return nil }
+func (m *MockQwenProvider) Validate() error                             { return nil }
+func (m *MockQwenProvider) GetPTYCommand() (*exec.Cmd, error)           { return exec.Command("echo"), nil }
+func (m *MockQwenProvider) GetPTYCommandWithPrompt(prompt string) (*exec.Cmd, error) {
+	return exec.Command("echo", prompt), nil
+}
+func (m *MockQwenProvider) Features() core.ProviderFeatures                            { return core.ProviderFeatures{} }
+func (m *MockQwenProvider) SupportsModel(model string) bool                            { return true }
 func (m *MockQwenProvider) PrepareSession(ctx context.Context, sessionID string) error { return nil }
 func (m *MockQwenProvider) CleanupSession(ctx context.Context, sessionID string) error { return nil }
-func (m *MockQwenProvider) GetReadyPattern() string                            { return "ready" }
-func (m *MockQwenProvider) GetOutputPattern() string                           { return "output" }
-func (m *MockQwenProvider) GetErrorPattern() string                            { return "error" }
-func (m *MockQwenProvider) GetPromptInjectionMethod() string                   { return "file" }
-func (m *MockQwenProvider) InjectPrompt(prompt string) error                   { return nil }
-func (m *MockQwenProvider) GetMCPServers() []core.MCPServer                    { return []core.MCPServer{} }
-func (m *MockQwenProvider) GetTools() []core.Tool                              { return []core.Tool{} }
-func (m *MockQwenProvider) GetSlashCommands() []core.SharedSlashCommand        { return []core.SharedSlashCommand{} }
-func (m *MockQwenProvider) GetPlugins() []core.PluginReference                 { return []core.PluginReference{} }
-func (m *MockQwenProvider) SupportsSlashCommands() bool                        { return false }
-func (m *MockQwenProvider) GetSlashCommandDirectory() string                   { return "" }
-func (m *MockQwenProvider) GetSlashCommandFormat() string                      { return "" }
-func (m *MockQwenProvider) PrepareSlashCommands(commands []core.SharedSlashCommand, targetDir string) error { return nil }
+func (m *MockQwenProvider) GetReadyPattern() string                                    { return "ready" }
+func (m *MockQwenProvider) GetOutputPattern() string                                   { return "output" }
+func (m *MockQwenProvider) GetErrorPattern() string                                    { return "error" }
+func (m *MockQwenProvider) GetPromptInjectionMethod() string                           { return "file" }
+func (m *MockQwenProvider) InjectPrompt(prompt string) error                           { return nil }
+func (m *MockQwenProvider) GetMCPServers() []core.MCPServer                            { return []core.MCPServer{} }
+func (m *MockQwenProvider) GetTools() []core.Tool                                      { return []core.Tool{} }
+func (m *MockQwenProvider) GetSlashCommands() []core.SharedSlashCommand {
+	return []core.SharedSlashCommand{}
+}
+func (m *MockQwenProvider) GetPlugins() []core.PluginReference { return []core.PluginReference{} }
+func (m *MockQwenProvider) SupportsSlashCommands() bool        { return false }
+func (m *MockQwenProvider) GetSlashCommandDirectory() string   { return "" }
+func (m *MockQwenProvider) GetSlashCommandFormat() string      { return "" }
+func (m *MockQwenProvider) PrepareSlashCommands(commands []core.SharedSlashCommand, targetDir string) error {
+	return nil
+}
 
 // Benchmark tests
 func BenchmarkQwenAdapter_TaskAdaptation(b *testing.B) {
@@ -522,8 +528,8 @@ func BenchmarkQwenAdapter_TaskAdaptation(b *testing.B) {
 	})
 
 	task := core.SubAgentTask{
-		ID:   "bench-task",
-		Name: "Benchmark Task",
+		ID:    "bench-task",
+		Name:  "Benchmark Task",
 		Input: "def example(): return 42",
 		Context: map[string]interface{}{
 			"language": "python",

@@ -29,15 +29,15 @@ import (
 
 func TestGeminiAdapter_Creation(t *testing.T) {
 	config := core.SubAgentConfig{
-		Name:        "gemini-test-agent",
-		Type:        core.SubAgentTypeProgrammatic,
-		Provider:    core.ProviderTypeGemini,
-		Model:       "gemini-pro",
-		Description: "Test Gemini agent",
+		Name:         "gemini-test-agent",
+		Type:         core.SubAgentTypeProgrammatic,
+		Provider:     core.ProviderTypeGemini,
+		Model:        "gemini-pro",
+		Description:  "Test Gemini agent",
 		Capabilities: []string{"code", "analysis", "creativity"},
-		Strategy:    core.DelegationProactive,
-		MaxRetries:  2,
-		Timeout:     time.Minute * 3,
+		Strategy:     core.DelegationProactive,
+		MaxRetries:   2,
+		Timeout:      time.Minute * 3,
 	}
 
 	adapter := NewGeminiAdapter(config)
@@ -55,9 +55,9 @@ func TestGeminiAdapter_Initialize(t *testing.T) {
 
 	t.Run("Initialize with valid config", func(t *testing.T) {
 		config := core.SubAgentConfig{
-			Name:        "initialized-gemini",
-			Provider:    core.ProviderTypeGemini,
-			Model:       "gemini-ultra",
+			Name:         "initialized-gemini",
+			Provider:     core.ProviderTypeGemini,
+			Model:        "gemini-ultra",
 			Capabilities: []string{"advanced", "multimodal"},
 		}
 
@@ -173,7 +173,7 @@ func TestGeminiAdapter_ResultAdaptation(t *testing.T) {
 
 	t.Run("Adapt failed result", func(t *testing.T) {
 		geminiResult := map[string]interface{}{
-			"status":       "error",
+			"status":        "error",
 			"error_message": "Processing failed: invalid input",
 		}
 
@@ -223,7 +223,7 @@ func TestGeminiAdapter_SubAgentScope(t *testing.T) {
 
 		adapted, err := adapter.AdaptTask(task)
 		require.NoError(t, err)
-		
+
 		// Verify scope configuration
 		if scopeConfig, ok := adapted.(map[string]interface{}); ok {
 			assert.NotNil(t, scopeConfig)
@@ -325,9 +325,9 @@ func TestGeminiAdapter_ProviderIntegration(t *testing.T) {
 
 	t.Run("Get provider config", func(t *testing.T) {
 		adapter.config.ProviderConfig = map[string]interface{}{
-			"api_key":           "test-key",
-			"temperature":       0.7,
-			"safety_settings":   "moderate",
+			"api_key":         "test-key",
+			"temperature":     0.7,
+			"safety_settings": "moderate",
 		}
 
 		config := adapter.GetProviderConfig()
@@ -414,29 +414,35 @@ type MockGeminiProvider struct {
 	typ  core.ProviderType
 }
 
-func (m *MockGeminiProvider) Name() string                                       { return m.name }
-func (m *MockGeminiProvider) Type() core.ProviderType                            { return m.typ }
-func (m *MockGeminiProvider) Initialize(config core.ProviderConfig) error        { return nil }
-func (m *MockGeminiProvider) Validate() error                                    { return nil }
-func (m *MockGeminiProvider) GetPTYCommand() (*exec.Cmd, error)                  { return exec.Command("echo"), nil }
-func (m *MockGeminiProvider) GetPTYCommandWithPrompt(prompt string) (*exec.Cmd, error) { return exec.Command("echo", prompt), nil }
-func (m *MockGeminiProvider) Features() core.ProviderFeatures                    { return core.ProviderFeatures{} }
-func (m *MockGeminiProvider) SupportsModel(model string) bool                    { return true }
+func (m *MockGeminiProvider) Name() string                                { return m.name }
+func (m *MockGeminiProvider) Type() core.ProviderType                     { return m.typ }
+func (m *MockGeminiProvider) Initialize(config core.ProviderConfig) error { return nil }
+func (m *MockGeminiProvider) Validate() error                             { return nil }
+func (m *MockGeminiProvider) GetPTYCommand() (*exec.Cmd, error)           { return exec.Command("echo"), nil }
+func (m *MockGeminiProvider) GetPTYCommandWithPrompt(prompt string) (*exec.Cmd, error) {
+	return exec.Command("echo", prompt), nil
+}
+func (m *MockGeminiProvider) Features() core.ProviderFeatures                            { return core.ProviderFeatures{} }
+func (m *MockGeminiProvider) SupportsModel(model string) bool                            { return true }
 func (m *MockGeminiProvider) PrepareSession(ctx context.Context, sessionID string) error { return nil }
 func (m *MockGeminiProvider) CleanupSession(ctx context.Context, sessionID string) error { return nil }
-func (m *MockGeminiProvider) GetReadyPattern() string                            { return "ready" }
-func (m *MockGeminiProvider) GetOutputPattern() string                           { return "output" }
-func (m *MockGeminiProvider) GetErrorPattern() string                            { return "error" }
-func (m *MockGeminiProvider) GetPromptInjectionMethod() string                   { return "stdin" }
-func (m *MockGeminiProvider) InjectPrompt(prompt string) error                   { return nil }
-func (m *MockGeminiProvider) GetMCPServers() []core.MCPServer                    { return []core.MCPServer{} }
-func (m *MockGeminiProvider) GetTools() []core.Tool                              { return []core.Tool{} }
-func (m *MockGeminiProvider) GetSlashCommands() []core.SharedSlashCommand        { return []core.SharedSlashCommand{} }
-func (m *MockGeminiProvider) GetPlugins() []core.PluginReference                 { return []core.PluginReference{} }
-func (m *MockGeminiProvider) SupportsSlashCommands() bool                        { return false }
-func (m *MockGeminiProvider) GetSlashCommandDirectory() string                   { return "" }
-func (m *MockGeminiProvider) GetSlashCommandFormat() string                      { return "" }
-func (m *MockGeminiProvider) PrepareSlashCommands(commands []core.SharedSlashCommand, targetDir string) error { return nil }
+func (m *MockGeminiProvider) GetReadyPattern() string                                    { return "ready" }
+func (m *MockGeminiProvider) GetOutputPattern() string                                   { return "output" }
+func (m *MockGeminiProvider) GetErrorPattern() string                                    { return "error" }
+func (m *MockGeminiProvider) GetPromptInjectionMethod() string                           { return "stdin" }
+func (m *MockGeminiProvider) InjectPrompt(prompt string) error                           { return nil }
+func (m *MockGeminiProvider) GetMCPServers() []core.MCPServer                            { return []core.MCPServer{} }
+func (m *MockGeminiProvider) GetTools() []core.Tool                                      { return []core.Tool{} }
+func (m *MockGeminiProvider) GetSlashCommands() []core.SharedSlashCommand {
+	return []core.SharedSlashCommand{}
+}
+func (m *MockGeminiProvider) GetPlugins() []core.PluginReference { return []core.PluginReference{} }
+func (m *MockGeminiProvider) SupportsSlashCommands() bool        { return false }
+func (m *MockGeminiProvider) GetSlashCommandDirectory() string   { return "" }
+func (m *MockGeminiProvider) GetSlashCommandFormat() string      { return "" }
+func (m *MockGeminiProvider) PrepareSlashCommands(commands []core.SharedSlashCommand, targetDir string) error {
+	return nil
+}
 
 // Benchmark tests
 func BenchmarkGeminiAdapter_TaskAdaptation(b *testing.B) {

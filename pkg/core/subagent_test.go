@@ -48,9 +48,9 @@ func NewMockSubAgent(name string) *MockSubAgent {
 	}
 }
 
-func (m *MockSubAgent) Name() string                     { return m.name }
-func (m *MockSubAgent) Config() SubAgentConfig           { return m.config }
-func (m *MockSubAgent) Provider() ProviderType           { return m.config.Provider }
+func (m *MockSubAgent) Name() string           { return m.name }
+func (m *MockSubAgent) Config() SubAgentConfig { return m.config }
+func (m *MockSubAgent) Provider() ProviderType { return m.config.Provider }
 func (m *MockSubAgent) Initialize(config SubAgentConfig) error {
 	m.config = config
 	return nil
@@ -61,22 +61,22 @@ func (m *MockSubAgent) Validate() error {
 	}
 	return nil
 }
-func (m *MockSubAgent) Cleanup() error              { return nil }
-func (m *MockSubAgent) Status() ExecutionStatus     { return m.status }
-func (m *MockSubAgent) Cancel() error               { m.status = StatusCancelled; return nil }
+func (m *MockSubAgent) Cleanup() error                 { return nil }
+func (m *MockSubAgent) Status() ExecutionStatus        { return m.status }
+func (m *MockSubAgent) Cancel() error                  { m.status = StatusCancelled; return nil }
 func (m *MockSubAgent) GetProgress() (float64, string) { return 0.5, "processing" }
-func (m *MockSubAgent) GetCapabilities() []string   { return m.capabilities }
-func (m *MockSubAgent) SupportsParallel() bool      { return true }
-func (m *MockSubAgent) SupportsInteractive() bool   { return false }
+func (m *MockSubAgent) GetCapabilities() []string      { return m.capabilities }
+func (m *MockSubAgent) SupportsParallel() bool         { return true }
+func (m *MockSubAgent) SupportsInteractive() bool      { return false }
 
 func (m *MockSubAgent) Execute(ctx context.Context, task SubAgentTask) (*SubAgentResult, error) {
 	m.status = StatusRunning
 	defer func() { m.status = StatusCompleted }()
-	
+
 	if m.executeFunc != nil {
 		return m.executeFunc(ctx, task)
 	}
-	
+
 	return &SubAgentResult{
 		TaskID:    task.ID,
 		AgentName: m.name,
@@ -99,14 +99,10 @@ func (m *MockSubAgent) ExecuteAsync(ctx context.Context, task SubAgentTask) (<-c
 }
 
 func (m *MockSubAgent) CanHandle(task SubAgentTask) bool {
-	for _, cap := range m.capabilities {
-		for _, taskCap := range task.Context {
-			if cap == taskCap {
-				return true
-			}
-		}
+	if len(m.capabilities) == 0 {
+		return false
 	}
-	return len(m.capabilities) > 0
+	return MatchesCapabilities(m.capabilities, task)
 }
 
 func TestSubAgentConfig_Validation(t *testing.T) {
@@ -118,13 +114,13 @@ func TestSubAgentConfig_Validation(t *testing.T) {
 		{
 			name: "Valid config",
 			config: SubAgentConfig{
-				Name:        "test-agent",
-				Type:        SubAgentTypeWorkflow,
-				Provider:    ProviderTypeClaude,
-				Model:       "sonnet",
-				Strategy:    DelegationAutomatic,
-				MaxRetries:  3,
-				Timeout:     time.Minute * 5,
+				Name:       "test-agent",
+				Type:       SubAgentTypeWorkflow,
+				Provider:   ProviderTypeClaude,
+				Model:      "sonnet",
+				Strategy:   DelegationAutomatic,
+				MaxRetries: 3,
+				Timeout:    time.Minute * 5,
 			},
 			wantErr: false,
 		},
@@ -161,7 +157,7 @@ func TestSubAgentConfig_Validation(t *testing.T) {
 
 func TestSubAgentTask_Creation(t *testing.T) {
 	deadline := time.Now().Add(time.Hour)
-	
+
 	task := SubAgentTask{
 		ID:          "task-123",
 		Name:        "Test Task",
@@ -191,7 +187,7 @@ func TestSubAgentTask_Creation(t *testing.T) {
 func TestSubAgentResult_Creation(t *testing.T) {
 	startTime := time.Now()
 	endTime := startTime.Add(time.Second * 10)
-	
+
 	result := SubAgentResult{
 		TaskID:    "task-123",
 		AgentName: "test-agent",
@@ -245,14 +241,14 @@ func TestExecutionStatus(t *testing.T) {
 
 func TestMockSubAgent_Execution(t *testing.T) {
 	agent := NewMockSubAgent("test-agent")
-	
+
 	t.Run("Basic execution", func(t *testing.T) {
 		ctx := context.Background()
 		task := SubAgentTask{
 			ID:   "task-1",
 			Name: "Test Task",
 		}
-		
+
 		result, err := agent.Execute(ctx, task)
 		require.NoError(t, err)
 		assert.NotNil(t, result)
@@ -267,10 +263,10 @@ func TestMockSubAgent_Execution(t *testing.T) {
 			ID:   "task-2",
 			Name: "Async Task",
 		}
-		
+
 		resultChan, err := agent.ExecuteAsync(ctx, task)
 		require.NoError(t, err)
-		
+
 		result := <-resultChan
 		assert.NotNil(t, result)
 		assert.Equal(t, "task-2", result.TaskID)
@@ -285,10 +281,10 @@ func TestMockSubAgent_Execution(t *testing.T) {
 				Error:     errors.New("custom error"),
 			}, errors.New("custom error")
 		}
-		
+
 		ctx := context.Background()
 		task := SubAgentTask{ID: "task-3"}
-		
+
 		result, err := agent.Execute(ctx, task)
 		assert.Error(t, err)
 		assert.NotNil(t, result)
@@ -299,7 +295,7 @@ func TestMockSubAgent_Execution(t *testing.T) {
 func TestMockSubAgent_Capabilities(t *testing.T) {
 	agent := NewMockSubAgent("capable-agent")
 	agent.capabilities = []string{"code", "test", "review"}
-	
+
 	t.Run("Get capabilities", func(t *testing.T) {
 		caps := agent.GetCapabilities()
 		assert.Len(t, caps, 3)
@@ -315,7 +311,7 @@ func TestMockSubAgent_Capabilities(t *testing.T) {
 			},
 		}
 		assert.True(t, agent.CanHandle(task))
-		
+
 		task2 := SubAgentTask{
 			Context: map[string]interface{}{
 				"unknown": true,

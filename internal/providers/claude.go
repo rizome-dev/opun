@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/rizome-dev/opun/internal/config"
-	"github.com/rizome-dev/opun/internal/io"
 	"github.com/rizome-dev/opun/internal/utils"
 	"github.com/rizome-dev/opun/pkg/core"
 )
@@ -33,7 +32,6 @@ import (
 // ClaudeProvider implements the Provider interface for Claude CLI
 type ClaudeProvider struct {
 	*core.BaseProvider
-	session          *io.TransparentSession
 	clipboard        utils.Clipboard
 	injectionManager *config.InjectionManager
 	environment      *config.ProviderEnvironment
@@ -109,13 +107,7 @@ func (p *ClaudeProvider) GetPTYCommandWithPrompt(prompt string) (*exec.Cmd, erro
 
 // SupportsModel checks if Claude supports the given model
 func (p *ClaudeProvider) SupportsModel(model string) bool {
-	supportedModels := []string{"opus", "sonnet", "haiku"}
-	for _, m := range supportedModels {
-		if strings.EqualFold(m, model) {
-			return true
-		}
-	}
-	return false
+	return model != ""
 }
 
 // PrepareSession prepares a Claude session
@@ -316,52 +308,6 @@ func (p *ClaudeProvider) generateCommandMarkdown(cmd core.SharedSlashCommand) st
 	return sb.String()
 }
 
-// StartSession starts an interactive session
-func (p *ClaudeProvider) StartSession(ctx context.Context, workDir string) (*io.TransparentSession, error) {
-	cmd, args := p.getCommand()
-
-	config := io.TransparentSessionConfig{
-		Provider: p.Name(),
-		Command:  cmd,
-		Args:     args,
-	}
-
-	session, err := io.NewTransparentSession(config)
-	if err != nil {
-		return nil, err
-	}
-
-	p.session = session
-	return session, nil
-}
-
-// SendPrompt sends a prompt to the session
-func (p *ClaudeProvider) SendPrompt(prompt string) error {
-	if p.session == nil {
-		return fmt.Errorf("no active session")
-	}
-	return p.session.SendInput([]byte(prompt + "\n"))
-}
-
-// CloseSession closes the current session
-func (p *ClaudeProvider) CloseSession() error {
-	if p.session == nil {
-		return nil
-	}
-	err := p.session.Close()
-	p.session = nil
-	return err
-}
-
-// GetReadyPatterns returns patterns that indicate Claude is ready
-func (p *ClaudeProvider) GetReadyPatterns() []string {
-	return []string{
-		"Human:",
-		"Human Assistant Chat",
-		">",
-	}
-}
-
 // getCommand returns the command and args to run Claude
 func (p *ClaudeProvider) getCommand() (string, []string) {
 	config := p.Config()
@@ -388,21 +334,14 @@ func (p *ClaudeProvider) getCommand() (string, []string) {
 
 // checkClaudeCLI checks if the Claude CLI is available
 func (p *ClaudeProvider) checkClaudeCLI() error {
-	// Try 'claude' command first
-	if _, err := exec.LookPath("claude"); err == nil {
-		return nil
+	command := p.Config().Command
+	if command == "" {
+		command = "claude"
 	}
-
-	// Try 'npx claude-code' as fallback
-	if _, err := exec.LookPath("npx"); err == nil {
-		// Check if claude-code package is available
-		cmd := exec.Command("npx", "--no-install", "claude-code", "--version")
-		if err := cmd.Run(); err == nil {
-			return nil
-		}
+	if _, err := exec.LookPath(command); err != nil {
+		return fmt.Errorf("claude CLI %q not found in PATH", command)
 	}
-
-	return fmt.Errorf("claude CLI not found in PATH")
+	return nil
 }
 
 // getClaudeCommand returns the command to run Claude
@@ -448,11 +387,11 @@ func (p *ClaudeProvider) CreateSubAgent(config core.SubAgentConfig) (core.SubAge
 	// Import the claude adapter package
 	// This would be done at the top of the file in production
 	// For now, we'll create a simple wrapper
-	
+
 	if config.Provider != core.ProviderTypeClaude {
 		return nil, fmt.Errorf("invalid provider type for Claude: %s", config.Provider)
 	}
-	
+
 	// In production, this would use the claude.NewClaudeAdapter
 	// For now, return an error indicating the feature needs the adapter
 	return nil, fmt.Errorf("subagent creation requires claude adapter implementation")
@@ -465,40 +404,40 @@ func (p *ClaudeProvider) ListSubAgents() ([]core.SubAgentConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
-	
+
 	agentsDir := filepath.Join(homeDir, ".claude", "agents")
 	if _, err := os.Stat(agentsDir); os.IsNotExist(err) {
 		return []core.SubAgentConfig{}, nil
 	}
-	
+
 	var configs []core.SubAgentConfig
-	
+
 	// Read agent definition files
 	entries, err := os.ReadDir(agentsDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read agents directory: %w", err)
 	}
-	
+
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
 			continue
 		}
-		
+
 		// Parse agent definition (simplified for now)
 		name := strings.TrimSuffix(entry.Name(), ".md")
 		configs = append(configs, core.SubAgentConfig{
-			Name:        name,
-			Type:        core.SubAgentTypeDeclarative,
-			Provider:    core.ProviderTypeClaude,
-			Strategy:    core.DelegationAutomatic,
+			Name:     name,
+			Type:     core.SubAgentTypeDeclarative,
+			Provider: core.ProviderTypeClaude,
+			Strategy: core.DelegationAutomatic,
 		})
 	}
-	
+
 	// Also return registered subagents
 	for _, agent := range p.subAgents {
 		configs = append(configs, agent.Config())
 	}
-	
+
 	return configs, nil
 }
 
@@ -507,7 +446,7 @@ func (p *ClaudeProvider) GetSubAgent(name string) (core.SubAgent, error) {
 	if agent, exists := p.subAgents[name]; exists {
 		return agent, nil
 	}
-	
+
 	return nil, fmt.Errorf("subagent %s not found", name)
 }
 
@@ -521,11 +460,11 @@ func (p *ClaudeProvider) Delegate(ctx context.Context, task core.SubAgentTask) (
 			break
 		}
 	}
-	
+
 	if bestAgent == nil {
 		return nil, fmt.Errorf("no suitable agent found for task %s", task.Name)
 	}
-	
+
 	return bestAgent.Execute(ctx, task)
 }
 
@@ -534,7 +473,7 @@ func (p *ClaudeProvider) RegisterSubAgent(agent core.SubAgent) error {
 	if agent == nil {
 		return fmt.Errorf("agent cannot be nil")
 	}
-	
+
 	p.subAgents[agent.Name()] = agent
 	return nil
 }
@@ -544,7 +483,7 @@ func (p *ClaudeProvider) UnregisterSubAgent(name string) error {
 	if _, exists := p.subAgents[name]; !exists {
 		return fmt.Errorf("agent %s not found", name)
 	}
-	
+
 	delete(p.subAgents, name)
 	return nil
 }

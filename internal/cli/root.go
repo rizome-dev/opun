@@ -109,6 +109,11 @@ Simply type opun help [path to command] for full details.`,
 		capabilityCmd,
 	)
 
+	// Add Action commands
+	rootCmd.AddCommand(
+		actionCmd,
+	)
+
 	// Add SubAgent command
 	rootCmd.AddCommand(
 		SubAgentCmd(),
@@ -251,12 +256,7 @@ func initConfig(configFile string) error {
 		viper.SetConfigFile(configFile)
 	} else {
 		// Search for config in home directory
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-
-		opunDir := filepath.Join(home, ".opun")
+		opunDir := utils.OpunDir()
 
 		// Create opun directory if it doesn't exist with proper ownership
 		if err := utils.EnsureDir(opunDir); err != nil {

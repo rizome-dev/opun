@@ -18,7 +18,6 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -35,12 +34,7 @@ type PromptCommandGenerator struct {
 
 // NewPromptCommandGenerator creates a new prompt command generator
 func NewPromptCommandGenerator() (*PromptCommandGenerator, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-
-	gardenPath := filepath.Join(homeDir, ".opun", "promptgarden")
+	gardenPath := filepath.Join(utils.OpunDir(), "promptgarden")
 	garden, err := promptgarden.NewGarden(gardenPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize prompt garden: %w", err)

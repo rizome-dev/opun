@@ -19,6 +19,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"os"
 	"path/filepath"
 	"time"
@@ -80,12 +81,7 @@ Examples:
 // runInteractiveWorkflowSelection shows an interactive workflow selector
 func runInteractiveWorkflowSelection() error {
 	// List available workflows
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	workflowDir := filepath.Join(home, ".opun", "workflows")
+	workflowDir := filepath.Join(utils.OpunDir(), "workflows")
 	files, err := os.ReadDir(workflowDir)
 	if err != nil {
 		return fmt.Errorf("failed to read workflows: %w", err)
@@ -134,8 +130,7 @@ func runRefactor(name, outputDir string, vars map[string]string, interactive, en
 	fmt.Println()
 
 	// Initialize components
-	home, _ := os.UserHomeDir()
-	gardenPath := filepath.Join(home, ".opun", "promptgarden")
+	gardenPath := filepath.Join(utils.OpunDir(), "promptgarden")
 	garden, err := promptgarden.NewGarden(gardenPath)
 	if err != nil {
 		return fmt.Errorf("failed to initialize prompt garden: %w", err)
@@ -148,7 +143,7 @@ func runRefactor(name, outputDir string, vars map[string]string, interactive, en
 		cmdRegistry := command.NewRegistry()
 
 		// Initialize plugin manager
-		pluginPath := filepath.Join(home, ".opun", "plugins")
+		pluginPath := filepath.Join(utils.OpunDir(), "plugins")
 		manager := plugin.NewManager(pluginPath)
 
 		// Create unified MCP server
@@ -250,12 +245,7 @@ func loadRefactorWorkflow(name string) (*wf.Workflow, error) {
 		}
 	} else {
 		// Load from workflows directory
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, err
-		}
-
-		workflowPath := filepath.Join(home, ".opun", "workflows", name+".yaml")
+		workflowPath := filepath.Join(utils.OpunDir(), "workflows", name+".yaml")
 		data, err = os.ReadFile(workflowPath)
 		if err != nil {
 			return nil, fmt.Errorf("workflow '%s' not found", name)
@@ -263,8 +253,7 @@ func loadRefactorWorkflow(name string) (*wf.Workflow, error) {
 	}
 
 	// Parse workflow
-	home, _ := os.UserHomeDir()
-	workflowDir := filepath.Join(home, ".opun", "workflows")
+	workflowDir := filepath.Join(utils.OpunDir(), "workflows")
 	parser := workflow.NewParser(workflowDir)
 	return parser.Parse(data)
 }

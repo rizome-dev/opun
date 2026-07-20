@@ -19,7 +19,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -372,12 +371,7 @@ func saveSetupConfig(provider string, mcpServers []string) error {
 	viper.Set("mcp_servers", mcpServers)
 
 	// Ensure config directory exists
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	configDir := filepath.Join(home, ".opun")
+	configDir := utils.OpunDir()
 	if err := utils.EnsureDir(configDir); err != nil {
 		return err
 	}

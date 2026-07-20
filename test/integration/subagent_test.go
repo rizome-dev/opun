@@ -1,3 +1,5 @@
+//go:build integration
+
 package integration
 
 // Copyright (C) 2025 Rizome Labs, Inc.
@@ -25,8 +27,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rizome-dev/opun/internal/headless"
 	"github.com/rizome-dev/opun/internal/providers"
 	internalsubagent "github.com/rizome-dev/opun/internal/subagent"
+	claudeadapter "github.com/rizome-dev/opun/internal/subagent/claude"
+	geminiadapter "github.com/rizome-dev/opun/internal/subagent/gemini"
+	qwenadapter "github.com/rizome-dev/opun/internal/subagent/qwen"
 	"github.com/rizome-dev/opun/pkg/core"
 	"github.com/rizome-dev/opun/pkg/subagent"
 	"github.com/stretchr/testify/assert"
@@ -35,12 +41,27 @@ import (
 
 // Integration test requires actual providers to be available
 func skipIfNoProviders(t *testing.T) {
-	if os.Getenv("INTEGRATION_TEST") != "true" {
-		t.Skip("Skipping integration test. Set INTEGRATION_TEST=true to run")
+	if os.Getenv("INTEGRATION_TESTS") != "true" {
+		t.Skip("Skipping integration test. Set INTEGRATION_TESTS=true to run")
 	}
 }
 
+// useMockRunner swaps an adapter's headless runner for a canned one so
+// manager-level tests never spawn real provider CLIs
+func useMockRunner(adapter core.SubAgent) core.SubAgent {
+	switch a := adapter.(type) {
+	case *claudeadapter.ClaudeAdapter:
+		a.Runner = &headless.MockRunner{}
+	case *geminiadapter.GeminiAdapter:
+		a.Runner = &headless.MockRunner{}
+	case *qwenadapter.QwenAdapter:
+		a.Runner = &headless.MockRunner{}
+	}
+	return adapter
+}
+
 func TestSubAgent_EndToEndWorkflow(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	skipIfNoProviders(t)
 
 	// Create manager and factory
@@ -87,7 +108,7 @@ func TestSubAgent_EndToEndWorkflow(t *testing.T) {
 
 		// Execute tasks across providers
 		results, err := manager.CoordinateAcrossProviders(ctx, tasks)
-		
+
 		// May error if providers aren't available
 		if err != nil {
 			t.Logf("Cross-provider coordination error (expected if providers not available): %v", err)
@@ -176,6 +197,7 @@ func TestSubAgent_RealProviderInteraction(t *testing.T) {
 }
 
 func TestSubAgent_WorkflowExecution(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	skipIfNoProviders(t)
 
 	manager := subagent.NewManager()
@@ -184,21 +206,21 @@ func TestSubAgent_WorkflowExecution(t *testing.T) {
 	// Create workflow-based agents
 	configs := []core.SubAgentConfig{
 		{
-			Name:     "analyzer",
-			Provider: core.ProviderTypeMock, // Use mock for testing
-			Type:     core.SubAgentTypeWorkflow,
+			Name:         "analyzer",
+			Provider:     core.ProviderTypeMock, // Use mock for testing
+			Type:         core.SubAgentTypeWorkflow,
 			Capabilities: []string{"analysis"},
 		},
 		{
-			Name:     "generator",
-			Provider: core.ProviderTypeMock,
-			Type:     core.SubAgentTypeWorkflow,
+			Name:         "generator",
+			Provider:     core.ProviderTypeMock,
+			Type:         core.SubAgentTypeWorkflow,
 			Capabilities: []string{"generation"},
 		},
 		{
-			Name:     "validator",
-			Provider: core.ProviderTypeMock,
-			Type:     core.SubAgentTypeWorkflow,
+			Name:         "validator",
+			Provider:     core.ProviderTypeMock,
+			Type:         core.SubAgentTypeWorkflow,
 			Capabilities: []string{"validation"},
 		},
 	}
@@ -207,7 +229,7 @@ func TestSubAgent_WorkflowExecution(t *testing.T) {
 	for _, config := range configs {
 		adapter, err := factory.CreateAdapter(config)
 		require.NoError(t, err)
-		err = manager.Register(adapter)
+		err = manager.Register(useMockRunner(adapter))
 		require.NoError(t, err)
 	}
 
@@ -272,6 +294,7 @@ func TestSubAgent_WorkflowExecution(t *testing.T) {
 }
 
 func TestSubAgent_MCPIntegration(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	skipIfNoProviders(t)
 
 	t.Run("MCP Task tool delegation", func(t *testing.T) {
@@ -294,7 +317,7 @@ func TestSubAgent_MCPIntegration(t *testing.T) {
 			t.Skipf("MCP not available: %v", err)
 		}
 
-		err = manager.Register(adapter)
+		err = manager.Register(useMockRunner(adapter))
 		require.NoError(t, err)
 
 		// Test MCP delegation
@@ -315,6 +338,7 @@ func TestSubAgent_MCPIntegration(t *testing.T) {
 }
 
 func TestSubAgent_PerformanceAndScaling(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	manager := subagent.NewManager()
 	factory := internalsubagent.NewFactory()
 
@@ -322,14 +346,15 @@ func TestSubAgent_PerformanceAndScaling(t *testing.T) {
 	numAgents := 50
 	for i := 0; i < numAgents; i++ {
 		config := core.SubAgentConfig{
-			Name:     string(rune('a' + (i % 26))) + string(rune('0' + (i / 26))),
-			Provider: core.ProviderTypeClaude,
-			Capabilities: []string{"cap" + string(rune(i % 10))},
+			Name:         string(rune('a'+(i%26))) + string(rune('0'+(i/26))),
+			Description:  "scaling test agent",
+			Provider:     core.ProviderTypeClaude,
+			Capabilities: []string{"cap" + string(rune(i%10))},
 		}
 
 		adapter, err := factory.CreateAdapter(config)
 		require.NoError(t, err)
-		err = manager.Register(adapter)
+		err = manager.Register(useMockRunner(adapter))
 		require.NoError(t, err)
 	}
 
@@ -341,10 +366,10 @@ func TestSubAgent_PerformanceAndScaling(t *testing.T) {
 		tasks := make([]core.SubAgentTask, numTasks)
 		for i := 0; i < numTasks; i++ {
 			tasks[i] = core.SubAgentTask{
-				ID:   string(rune('A' + (i % 26))) + string(rune('0' + (i / 26))),
+				ID:   string(rune('A'+(i%26))) + string(rune('0'+(i/26))),
 				Name: "Task " + string(rune(i)),
 				Context: map[string]interface{}{
-					"cap" + string(rune(i % 10)): true,
+					"cap" + string(rune(i%10)): true,
 				},
 			}
 		}
@@ -357,7 +382,7 @@ func TestSubAgent_PerformanceAndScaling(t *testing.T) {
 		assert.Len(t, results, numTasks)
 
 		t.Logf("Executed %d tasks across %d agents in %v", numTasks, numAgents, duration)
-		
+
 		// Performance assertion - should complete reasonably fast
 		assert.Less(t, duration, time.Second*10, "Parallel execution took too long")
 	})
@@ -377,9 +402,9 @@ func TestSubAgent_PerformanceAndScaling(t *testing.T) {
 
 				for t := 0; t < tasksPerGoroutine; t++ {
 					task := core.SubAgentTask{
-						ID: string(rune('G' + goroutineID)) + string(rune('T' + t)),
+						ID: string(rune('G'+goroutineID)) + string(rune('T'+t)),
 						Context: map[string]interface{}{
-							"cap" + string(rune(goroutineID % 10)): true,
+							"cap" + string(rune(goroutineID%10)): true,
 						},
 					}
 
@@ -408,6 +433,7 @@ func TestSubAgent_PerformanceAndScaling(t *testing.T) {
 }
 
 func TestSubAgent_ErrorHandlingAndRecovery(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	manager := subagent.NewManager()
 
 	// Create agents with different failure modes
@@ -425,7 +451,7 @@ func TestSubAgent_ErrorHandlingAndRecovery(t *testing.T) {
 
 	t.Run("Handle agent failures", func(t *testing.T) {
 		ctx := context.Background()
-		
+
 		// First two executions should succeed
 		for i := 0; i < 2; i++ {
 			task := core.SubAgentTask{ID: string(rune('a' + i))}
@@ -449,7 +475,7 @@ func TestSubAgent_ErrorHandlingAndRecovery(t *testing.T) {
 
 		task := core.SubAgentTask{ID: "timeout-task"}
 		result, err := manager.Execute(ctx, task, "timeout-agent")
-		
+
 		assert.Error(t, err)
 		if result != nil {
 			assert.Contains(t, []core.ExecutionStatus{
@@ -499,23 +525,23 @@ type FailingMockAgent struct {
 	failAfter      int
 }
 
-func (f *FailingMockAgent) Name() string                   { return f.name }
-func (f *FailingMockAgent) Config() core.SubAgentConfig    { return core.SubAgentConfig{Name: f.name} }
-func (f *FailingMockAgent) Provider() core.ProviderType    { return core.ProviderTypeMock }
+func (f *FailingMockAgent) Name() string                                { return f.name }
+func (f *FailingMockAgent) Config() core.SubAgentConfig                 { return core.SubAgentConfig{Name: f.name} }
+func (f *FailingMockAgent) Provider() core.ProviderType                 { return core.ProviderTypeMock }
 func (f *FailingMockAgent) Initialize(config core.SubAgentConfig) error { return nil }
-func (f *FailingMockAgent) Validate() error                { return nil }
-func (f *FailingMockAgent) Cleanup() error                 { return nil }
-func (f *FailingMockAgent) Status() core.ExecutionStatus   { return core.StatusPending }
-func (f *FailingMockAgent) Cancel() error                  { return nil }
-func (f *FailingMockAgent) GetProgress() (float64, string) { return 0, "" }
-func (f *FailingMockAgent) GetCapabilities() []string      { return []string{} }
-func (f *FailingMockAgent) SupportsParallel() bool         { return false }
-func (f *FailingMockAgent) SupportsInteractive() bool      { return false }
-func (f *FailingMockAgent) CanHandle(task core.SubAgentTask) bool { return true }
+func (f *FailingMockAgent) Validate() error                             { return nil }
+func (f *FailingMockAgent) Cleanup() error                              { return nil }
+func (f *FailingMockAgent) Status() core.ExecutionStatus                { return core.StatusPending }
+func (f *FailingMockAgent) Cancel() error                               { return nil }
+func (f *FailingMockAgent) GetProgress() (float64, string)              { return 0, "" }
+func (f *FailingMockAgent) GetCapabilities() []string                   { return []string{} }
+func (f *FailingMockAgent) SupportsParallel() bool                      { return false }
+func (f *FailingMockAgent) SupportsInteractive() bool                   { return false }
+func (f *FailingMockAgent) CanHandle(task core.SubAgentTask) bool       { return true }
 
 func (f *FailingMockAgent) Execute(ctx context.Context, task core.SubAgentTask) (*core.SubAgentResult, error) {
 	f.executionCount++
-	
+
 	if f.executionCount > f.failAfter {
 		return &core.SubAgentResult{
 			TaskID:    task.ID,
@@ -549,19 +575,19 @@ type TimeoutMockAgent struct {
 	timeout time.Duration
 }
 
-func (t *TimeoutMockAgent) Name() string                   { return t.name }
-func (t *TimeoutMockAgent) Config() core.SubAgentConfig    { return core.SubAgentConfig{Name: t.name} }
-func (t *TimeoutMockAgent) Provider() core.ProviderType    { return core.ProviderTypeMock }
+func (t *TimeoutMockAgent) Name() string                                { return t.name }
+func (t *TimeoutMockAgent) Config() core.SubAgentConfig                 { return core.SubAgentConfig{Name: t.name} }
+func (t *TimeoutMockAgent) Provider() core.ProviderType                 { return core.ProviderTypeMock }
 func (t *TimeoutMockAgent) Initialize(config core.SubAgentConfig) error { return nil }
-func (t *TimeoutMockAgent) Validate() error                { return nil }
-func (t *TimeoutMockAgent) Cleanup() error                 { return nil }
-func (t *TimeoutMockAgent) Status() core.ExecutionStatus   { return core.StatusPending }
-func (t *TimeoutMockAgent) Cancel() error                  { return nil }
-func (t *TimeoutMockAgent) GetProgress() (float64, string) { return 0, "" }
-func (t *TimeoutMockAgent) GetCapabilities() []string      { return []string{} }
-func (t *TimeoutMockAgent) SupportsParallel() bool         { return false }
-func (t *TimeoutMockAgent) SupportsInteractive() bool      { return false }
-func (t *TimeoutMockAgent) CanHandle(task core.SubAgentTask) bool { return true }
+func (t *TimeoutMockAgent) Validate() error                             { return nil }
+func (t *TimeoutMockAgent) Cleanup() error                              { return nil }
+func (t *TimeoutMockAgent) Status() core.ExecutionStatus                { return core.StatusPending }
+func (t *TimeoutMockAgent) Cancel() error                               { return nil }
+func (t *TimeoutMockAgent) GetProgress() (float64, string)              { return 0, "" }
+func (t *TimeoutMockAgent) GetCapabilities() []string                   { return []string{} }
+func (t *TimeoutMockAgent) SupportsParallel() bool                      { return false }
+func (t *TimeoutMockAgent) SupportsInteractive() bool                   { return false }
+func (t *TimeoutMockAgent) CanHandle(task core.SubAgentTask) bool       { return true }
 
 func (t *TimeoutMockAgent) Execute(ctx context.Context, task core.SubAgentTask) (*core.SubAgentResult, error) {
 	select {

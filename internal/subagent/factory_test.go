@@ -27,6 +27,7 @@ import (
 )
 
 func TestFactory_CreateAdapter(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	factory := NewFactory()
 
 	tests := []struct {
@@ -106,6 +107,7 @@ func TestFactory_CreateAdapter(t *testing.T) {
 }
 
 func TestFactory_RegisterProvider(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	factory := NewFactory()
 
 	t.Run("Register provider", func(t *testing.T) {
@@ -113,17 +115,17 @@ func TestFactory_RegisterProvider(t *testing.T) {
 			name: "test-provider",
 			typ:  core.ProviderTypeClaude,
 		}
-		
+
 		err := factory.RegisterProvider(provider)
 		require.NoError(t, err)
-		
+
 		// Create adapter with registered provider
 		config := core.SubAgentConfig{
 			Name:        "test-agent",
 			Provider:    core.ProviderTypeClaude,
 			Description: "Test",
 		}
-		
+
 		adapter, err := factory.CreateAdapter(config)
 		// May error due to initialization
 		if err != nil {
@@ -145,7 +147,7 @@ func TestFactory_ListSupportedProviders(t *testing.T) {
 
 	providers := factory.ListSupportedProviders()
 	assert.NotEmpty(t, providers)
-	
+
 	// Should include built-in providers
 	assert.Contains(t, providers, core.ProviderTypeClaude)
 	assert.Contains(t, providers, core.ProviderTypeGemini)
@@ -154,6 +156,7 @@ func TestFactory_ListSupportedProviders(t *testing.T) {
 }
 
 func TestFactory_CreateSubAgent(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	factory := NewFactory()
 
 	config := core.SubAgentConfig{
@@ -190,7 +193,7 @@ func TestFactory_GetProviderCapabilities(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(string(tt.providerType), func(t *testing.T) {
 			capability, err := factory.GetProviderCapabilities(tt.providerType)
-			
+
 			if tt.shouldError {
 				assert.Error(t, err)
 			} else {
@@ -202,17 +205,18 @@ func TestFactory_GetProviderCapabilities(t *testing.T) {
 }
 
 func TestFactory_CreateDefaultConfigs(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	factory := NewFactory()
 
 	configs := factory.CreateDefaultConfigs()
 	assert.NotEmpty(t, configs)
-	
+
 	// Should have at least one config for each provider
 	providers := make(map[core.ProviderType]bool)
 	for _, config := range configs {
 		providers[config.Provider] = true
 	}
-	
+
 	assert.True(t, providers[core.ProviderTypeClaude])
 	assert.True(t, providers[core.ProviderTypeGemini])
 	assert.True(t, providers[core.ProviderTypeQwen])
@@ -237,15 +241,15 @@ func (m *MockAdapter) Initialize(config core.SubAgentConfig) error {
 	m.config = config
 	return nil
 }
-func (m *MockAdapter) Validate() error                                      { return nil }
-func (m *MockAdapter) Cleanup() error                                       { return nil }
-func (m *MockAdapter) Status() core.ExecutionStatus                         { return core.StatusPending }
-func (m *MockAdapter) Cancel() error                                        { return nil }
-func (m *MockAdapter) GetProgress() (float64, string)                       { return 0, "" }
-func (m *MockAdapter) GetCapabilities() []string                            { return []string{} }
-func (m *MockAdapter) SupportsParallel() bool                               { return false }
-func (m *MockAdapter) SupportsInteractive() bool                            { return false }
-func (m *MockAdapter) CanHandle(task core.SubAgentTask) bool                { return true }
+func (m *MockAdapter) Validate() error                       { return nil }
+func (m *MockAdapter) Cleanup() error                        { return nil }
+func (m *MockAdapter) Status() core.ExecutionStatus          { return core.StatusPending }
+func (m *MockAdapter) Cancel() error                         { return nil }
+func (m *MockAdapter) GetProgress() (float64, string)        { return 0, "" }
+func (m *MockAdapter) GetCapabilities() []string             { return []string{} }
+func (m *MockAdapter) SupportsParallel() bool                { return false }
+func (m *MockAdapter) SupportsInteractive() bool             { return false }
+func (m *MockAdapter) CanHandle(task core.SubAgentTask) bool { return true }
 func (m *MockAdapter) InitializeProvider(provider core.Provider) error {
 	m.provider = provider
 	return nil
@@ -288,30 +292,30 @@ type MockProvider struct {
 	core.BaseProvider
 }
 
-func (m *MockProvider) Name() string            { return m.name }
-func (m *MockProvider) Type() core.ProviderType { return m.typ }
+func (m *MockProvider) Name() string                                { return m.name }
+func (m *MockProvider) Type() core.ProviderType                     { return m.typ }
 func (m *MockProvider) Initialize(config core.ProviderConfig) error { return nil }
-func (m *MockProvider) Validate() error { return nil }
-func (m *MockProvider) GetPTYCommand() (*exec.Cmd, error) { return exec.Command("echo"), nil }
+func (m *MockProvider) Validate() error                             { return nil }
+func (m *MockProvider) GetPTYCommand() (*exec.Cmd, error)           { return exec.Command("echo"), nil }
 func (m *MockProvider) GetPTYCommandWithPrompt(prompt string) (*exec.Cmd, error) {
 	return exec.Command("echo", prompt), nil
 }
-func (m *MockProvider) Features() core.ProviderFeatures { return core.ProviderFeatures{} }
-func (m *MockProvider) SupportsModel(model string) bool { return true }
+func (m *MockProvider) Features() core.ProviderFeatures                            { return core.ProviderFeatures{} }
+func (m *MockProvider) SupportsModel(model string) bool                            { return true }
 func (m *MockProvider) PrepareSession(ctx context.Context, sessionID string) error { return nil }
 func (m *MockProvider) CleanupSession(ctx context.Context, sessionID string) error { return nil }
-func (m *MockProvider) GetReadyPattern() string { return "ready" }
-func (m *MockProvider) GetOutputPattern() string { return "done" }
-func (m *MockProvider) GetErrorPattern() string { return "error" }
-func (m *MockProvider) GetPromptInjectionMethod() string { return "stdin" }
-func (m *MockProvider) InjectPrompt(prompt string) error { return nil }
-func (m *MockProvider) GetMCPServers() []core.MCPServer { return nil }
-func (m *MockProvider) GetTools() []core.Tool { return nil }
-func (m *MockProvider) GetSlashCommands() []core.SharedSlashCommand { return nil }
-func (m *MockProvider) GetPlugins() []core.PluginReference { return nil }
-func (m *MockProvider) SupportsSlashCommands() bool { return false }
-func (m *MockProvider) GetSlashCommandDirectory() string { return "" }
-func (m *MockProvider) GetSlashCommandFormat() string { return "" }
+func (m *MockProvider) GetReadyPattern() string                                    { return "ready" }
+func (m *MockProvider) GetOutputPattern() string                                   { return "done" }
+func (m *MockProvider) GetErrorPattern() string                                    { return "error" }
+func (m *MockProvider) GetPromptInjectionMethod() string                           { return "stdin" }
+func (m *MockProvider) InjectPrompt(prompt string) error                           { return nil }
+func (m *MockProvider) GetMCPServers() []core.MCPServer                            { return nil }
+func (m *MockProvider) GetTools() []core.Tool                                      { return nil }
+func (m *MockProvider) GetSlashCommands() []core.SharedSlashCommand                { return nil }
+func (m *MockProvider) GetPlugins() []core.PluginReference                         { return nil }
+func (m *MockProvider) SupportsSlashCommands() bool                                { return false }
+func (m *MockProvider) GetSlashCommandDirectory() string                           { return "" }
+func (m *MockProvider) GetSlashCommandFormat() string                              { return "" }
 func (m *MockProvider) PrepareSlashCommands(commands []core.SharedSlashCommand, targetDir string) error {
 	return nil
 }

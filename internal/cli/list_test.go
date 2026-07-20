@@ -57,9 +57,7 @@ func TestListCmd(t *testing.T) {
 func TestShowWorkflows(t *testing.T) {
 	// Set up test environment
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tempDir)
 
 	// Capture output
 	oldStdout := os.Stdout
@@ -136,9 +134,7 @@ func TestShowWorkflows(t *testing.T) {
 func TestShowPrompts(t *testing.T) {
 	// Set up test environment
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tempDir)
 
 	// Capture output
 	oldStdout := os.Stdout
@@ -175,9 +171,7 @@ func TestShowPrompts(t *testing.T) {
 func TestShowActions(t *testing.T) {
 	// Set up test environment
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tempDir)
 
 	// Capture output
 	oldStdout := os.Stdout
@@ -203,9 +197,7 @@ func TestShowActions(t *testing.T) {
 func TestListCmd_Execute(t *testing.T) {
 	// Set up test environment
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tempDir)
 
 	t.Run("List All", func(t *testing.T) {
 		// Create fresh command for each test

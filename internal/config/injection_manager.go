@@ -43,12 +43,7 @@ func NewInjectionManager(actionRegistry core.ActionRegistry) (*InjectionManager,
 	}
 
 	// Create workspace directory for temporary configs
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-
-	workspaceDir := filepath.Join(homeDir, ".opun", "workspace")
+	workspaceDir := filepath.Join(utils.OpunDir(), "workspace")
 	if err := utils.EnsureDir(workspaceDir); err != nil {
 		return nil, fmt.Errorf("failed to create workspace: %w", err)
 	}

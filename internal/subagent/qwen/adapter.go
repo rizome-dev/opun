@@ -19,10 +19,12 @@ package qwen
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/rizome-dev/opun/internal/headless"
 	"github.com/rizome-dev/opun/pkg/core"
 )
 
@@ -32,6 +34,7 @@ type QwenAdapter struct {
 	provider core.Provider
 	status   core.ExecutionStatus
 	executor *ToolExecutor
+	Runner   headless.Runner
 }
 
 // ToolExecutor represents Qwen's non-interactive tool executor
@@ -48,6 +51,7 @@ func NewQwenAdapter(config core.SubAgentConfig) *QwenAdapter {
 	return &QwenAdapter{
 		config: config,
 		status: core.StatusPending,
+		Runner: &headless.QwenRunner{},
 	}
 }
 
@@ -69,7 +73,7 @@ func (a *QwenAdapter) Provider() core.ProviderType {
 // Initialize initializes the adapter
 func (a *QwenAdapter) Initialize(config core.SubAgentConfig) error {
 	a.config = config
-	
+
 	// Create tool executor configuration
 	a.executor = &ToolExecutor{
 		Name:        config.Name,
@@ -78,12 +82,12 @@ func (a *QwenAdapter) Initialize(config core.SubAgentConfig) error {
 		Model:       config.Model,
 		Config:      config.ProviderConfig,
 	}
-	
+
 	// Set default model if not specified
 	if a.executor.Model == "" {
-		a.executor.Model = "qwen-coder-32b-instruct"
+		a.executor.Model = "qwen3-coder-plus"
 	}
-	
+
 	return nil
 }
 
@@ -92,11 +96,7 @@ func (a *QwenAdapter) Validate() error {
 	if a.config.Name == "" {
 		return fmt.Errorf("agent name is required")
 	}
-	
-	if a.config.Description == "" {
-		return fmt.Errorf("agent description is required")
-	}
-	
+
 	return nil
 }
 
@@ -106,50 +106,42 @@ func (a *QwenAdapter) Cleanup() error {
 	return nil
 }
 
-// Execute executes a task using Qwen's tool executor pattern
+// Execute executes a task via Qwen's headless print mode
 func (a *QwenAdapter) Execute(ctx context.Context, task core.SubAgentTask) (*core.SubAgentResult, error) {
 	startTime := time.Now()
 	a.status = core.StatusRunning
-	
-	// Build the execution prompt for Qwen
-	execPrompt := a.buildExecutionPrompt(task)
-	
-	// Execute via provider (this would use PTY in real implementation)
-	if a.provider != nil {
-		// For Qwen, we use the non-interactive mode with specific termination
-		if err := a.provider.InjectPrompt(execPrompt); err != nil {
-			a.status = core.StatusFailed
-			return &core.SubAgentResult{
-				TaskID:    task.ID,
-				AgentName: a.config.Name,
-				Status:    core.StatusFailed,
-				Error:     err,
-				StartTime: startTime,
-				EndTime:   time.Now(),
-				Duration:  time.Since(startTime),
-			}, err
-		}
+
+	result, err := a.Runner.Run(ctx, headless.Request{
+		Prompt:       a.buildExecutionPrompt(task),
+		SystemPrompt: a.config.SystemPrompt,
+		Model:        a.config.Model,
+	})
+	if err != nil {
+		a.status = core.StatusFailed
+		return &core.SubAgentResult{
+			TaskID:    task.ID,
+			AgentName: a.config.Name,
+			Status:    core.StatusFailed,
+			Error:     err,
+			StartTime: startTime,
+			EndTime:   time.Now(),
+			Duration:  time.Since(startTime),
+		}, err
 	}
-	
-	// In a real implementation, we would:
-	// 1. Monitor PTY output
-	// 2. Parse structured output
-	// 3. Detect completion patterns
-	
+
 	a.status = core.StatusCompleted
-	
+
 	return &core.SubAgentResult{
 		TaskID:    task.ID,
 		AgentName: a.config.Name,
 		Status:    core.StatusCompleted,
-		Output:    fmt.Sprintf("Task %s completed by Qwen agent %s", task.Name, a.config.Name),
+		Output:    result.Output,
 		StartTime: startTime,
 		EndTime:   time.Now(),
 		Duration:  time.Since(startTime),
 		Metadata: map[string]interface{}{
 			"provider": "qwen",
-			"method":   "tool_executor",
-			"model":    a.executor.Model,
+			"method":   "headless",
 		},
 	}, nil
 }
@@ -157,13 +149,13 @@ func (a *QwenAdapter) Execute(ctx context.Context, task core.SubAgentTask) (*cor
 // ExecuteAsync executes a task asynchronously
 func (a *QwenAdapter) ExecuteAsync(ctx context.Context, task core.SubAgentTask) (<-chan *core.SubAgentResult, error) {
 	resultChan := make(chan *core.SubAgentResult, 1)
-	
+
 	go func() {
 		result, _ := a.Execute(ctx, task)
 		resultChan <- result
 		close(resultChan)
 	}()
-	
+
 	return resultChan, nil
 }
 
@@ -197,53 +189,17 @@ func (a *QwenAdapter) GetProgress() (float64, string) {
 
 // CanHandle checks if the agent can handle a task
 func (a *QwenAdapter) CanHandle(task core.SubAgentTask) bool {
-	// Check if task type is code-related (Qwen specializes in code)
-	taskType := extractTaskType(task)
-	codeRelated := []string{"code", "coding", "programming", "debug", "refactor", "test", "implement"}
-	
-	for _, codeType := range codeRelated {
-		if strings.Contains(strings.ToLower(taskType), codeType) {
-			return true
-		}
-		if strings.Contains(strings.ToLower(task.Description), codeType) {
-			return true
-		}
-	}
-	
-	// Check capabilities match
-	for _, cap := range a.config.Capabilities {
-		capLower := strings.ToLower(cap)
-		if strings.Contains(strings.ToLower(task.Description), capLower) {
-			return true
-		}
-		for _, constraint := range task.Constraints {
-			if strings.Contains(strings.ToLower(constraint), capLower) {
-				return true
-			}
-		}
-	}
-	
-	return false
+	return core.MatchesCapabilities(a.config.Capabilities, task)
 }
 
 // GetCapabilities returns agent capabilities
 func (a *QwenAdapter) GetCapabilities() []string {
-	// Add Qwen-specific capabilities
-	caps := append([]string{}, a.config.Capabilities...)
-	caps = append(caps, 
-		"code_generation",
-		"code_review",
-		"debugging",
-		"refactoring",
-		"test_generation",
-		"documentation",
-	)
-	return caps
+	return a.config.Capabilities
 }
 
 // SupportsParallel checks if parallel execution is supported
 func (a *QwenAdapter) SupportsParallel() bool {
-	return !a.config.Interactive // Non-interactive mode supports parallel
+	return a.config.Parallel
 }
 
 // SupportsInteractive checks if interactive mode is supported
@@ -270,14 +226,14 @@ func (a *QwenAdapter) AdaptTask(task core.SubAgentTask) (interface{}, error) {
 		"context":     task.Context,
 		"variables":   task.Variables,
 	}
-	
+
 	return qwenTask, nil
 }
 
 // AdaptResult adapts Qwen output to standard result format
 func (a *QwenAdapter) AdaptResult(result interface{}) (*core.SubAgentResult, error) {
 	var output string
-	
+
 	switch v := result.(type) {
 	case string:
 		output = v
@@ -294,15 +250,58 @@ func (a *QwenAdapter) AdaptResult(result interface{}) (*core.SubAgentResult, err
 	default:
 		output = fmt.Sprintf("%v", result)
 	}
-	
-	return &core.SubAgentResult{
+
+	res := &core.SubAgentResult{
 		Status: core.StatusCompleted,
 		Output: output,
 		Metadata: map[string]interface{}{
 			"raw_result": result,
 			"provider":   "qwen",
 		},
-	}, nil
+	}
+
+	if m, ok := result.(map[string]interface{}); ok {
+		if status, _ := m["status"].(string); status == "error" || status == "failed" {
+			res.Status = core.StatusFailed
+			if msg, _ := m["error"].(string); msg != "" {
+				res.Error = errors.New(msg)
+			} else {
+				res.Error = errors.New("task failed")
+			}
+		}
+
+		for _, raw := range mapSlice(m["files"]) {
+			name, _ := raw["name"].(string)
+			content, _ := raw["content"].(string)
+			language, _ := raw["language"].(string)
+			res.Artifacts = append(res.Artifacts, core.SubAgentArtifact{
+				Name:        name,
+				Type:        "file",
+				Content:     []byte(content),
+				ContentType: language,
+				Size:        int64(len(content)),
+			})
+		}
+	}
+
+	return res, nil
+}
+
+func mapSlice(v interface{}) []map[string]interface{} {
+	switch s := v.(type) {
+	case []map[string]interface{}:
+		return s
+	case []interface{}:
+		out := make([]map[string]interface{}, 0, len(s))
+		for _, item := range s {
+			if m, ok := item.(map[string]interface{}); ok {
+				out = append(out, m)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
 }
 
 // GetProviderConfig returns provider-specific configuration
@@ -313,22 +312,22 @@ func (a *QwenAdapter) GetProviderConfig() map[string]interface{} {
 // buildExecutionPrompt builds the execution prompt for Qwen
 func (a *QwenAdapter) buildExecutionPrompt(task core.SubAgentTask) string {
 	var prompt strings.Builder
-	
+
 	// Add role definition
 	prompt.WriteString(fmt.Sprintf("You are %s, a specialized code assistant.\n", a.config.Name))
 	prompt.WriteString(fmt.Sprintf("Description: %s\n\n", a.config.Description))
-	
+
 	// Add task context
 	prompt.WriteString("## Task\n")
 	prompt.WriteString(fmt.Sprintf("Name: %s\n", task.Name))
 	prompt.WriteString(fmt.Sprintf("Description: %s\n\n", task.Description))
-	
+
 	// Add input if provided
 	if task.Input != "" {
 		prompt.WriteString("## Input\n")
 		prompt.WriteString(fmt.Sprintf("```\n%s\n```\n\n", task.Input))
 	}
-	
+
 	// Add constraints
 	if len(task.Constraints) > 0 {
 		prompt.WriteString("## Requirements\n")
@@ -337,7 +336,7 @@ func (a *QwenAdapter) buildExecutionPrompt(task core.SubAgentTask) string {
 		}
 		prompt.WriteString("\n")
 	}
-	
+
 	// Add output instructions
 	prompt.WriteString("## Instructions\n")
 	prompt.WriteString("1. Analyze the task carefully\n")
@@ -345,7 +344,7 @@ func (a *QwenAdapter) buildExecutionPrompt(task core.SubAgentTask) string {
 	prompt.WriteString("3. Include code in markdown code blocks\n")
 	prompt.WriteString("4. Explain your approach\n")
 	prompt.WriteString("5. End with '## TASK_COMPLETE' when done\n\n")
-	
+
 	// Add tools if specified
 	if len(a.config.Tools) > 0 {
 		prompt.WriteString("## Available Tools\n")
@@ -354,35 +353,10 @@ func (a *QwenAdapter) buildExecutionPrompt(task core.SubAgentTask) string {
 		}
 		prompt.WriteString("\n")
 	}
-	
+
 	prompt.WriteString("Please complete the task now:\n")
-	
+
 	return prompt.String()
-}
-
-// Helper functions
-
-func extractTaskType(task core.SubAgentTask) string {
-	if taskType, ok := task.Context["type"].(string); ok {
-		return taskType
-	}
-	
-	// Try to infer from description
-	desc := strings.ToLower(task.Description)
-	if strings.Contains(desc, "code") || strings.Contains(desc, "implement") {
-		return "code"
-	}
-	if strings.Contains(desc, "test") {
-		return "test"
-	}
-	if strings.Contains(desc, "debug") {
-		return "debug"
-	}
-	if strings.Contains(desc, "refactor") {
-		return "refactor"
-	}
-	
-	return "general"
 }
 
 func extractLanguage(task core.SubAgentTask) string {
@@ -390,12 +364,12 @@ func extractLanguage(task core.SubAgentTask) string {
 	if lang, ok := task.Context["language"].(string); ok {
 		return lang
 	}
-	
+
 	// Check variables
 	if lang, ok := task.Variables["language"].(string); ok {
 		return lang
 	}
-	
+
 	// Try to detect from input or description
 	languages := map[string][]string{
 		"python":     {"python", "py", "def ", "import ", "from "},
@@ -407,7 +381,7 @@ func extractLanguage(task core.SubAgentTask) string {
 		"c++":        {"c++", "cpp", "#include", "std::", "template"},
 		"c":          {"c", "#include", "void ", "int main"},
 	}
-	
+
 	text := strings.ToLower(task.Input + " " + task.Description)
 	for lang, patterns := range languages {
 		for _, pattern := range patterns {
@@ -416,6 +390,6 @@ func extractLanguage(task core.SubAgentTask) string {
 			}
 		}
 	}
-	
+
 	return "unknown"
 }

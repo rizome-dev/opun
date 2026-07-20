@@ -22,10 +22,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/rizome-dev/opun/internal/config"
-	"github.com/rizome-dev/opun/internal/io"
 	"github.com/rizome-dev/opun/internal/utils"
 	"github.com/rizome-dev/opun/pkg/core"
 )
@@ -33,7 +31,6 @@ import (
 // QwenProvider implements the Provider interface for Qwen Code CLI
 type QwenProvider struct {
 	*core.BaseProvider
-	session          *io.TransparentSession
 	clipboard        utils.Clipboard
 	injectionManager *config.InjectionManager
 	environment      *config.ProviderEnvironment
@@ -107,14 +104,7 @@ func (p *QwenProvider) GetPTYCommandWithPrompt(prompt string) (*exec.Cmd, error)
 
 // SupportsModel checks if Qwen supports the given model
 func (p *QwenProvider) SupportsModel(model string) bool {
-	// Qwen Code models - similar to Gemini but may have different names
-	supportedModels := []string{"pro", "flash", "ultra", "code", "chat"}
-	for _, m := range supportedModels {
-		if strings.EqualFold(m, model) {
-			return true
-		}
-	}
-	return false
+	return model != ""
 }
 
 // PrepareSession prepares a Qwen session
@@ -243,70 +233,15 @@ func (p *QwenProvider) PrepareSlashCommands(commands []core.SharedSlashCommand, 
 	return nil
 }
 
-// StartSession starts an interactive session
-func (p *QwenProvider) StartSession(ctx context.Context, workDir string) (*io.TransparentSession, error) {
-	cmd, args := p.getCommand()
-
-	config := io.TransparentSessionConfig{
-		Provider: p.Name(),
-		Command:  cmd,
-		Args:     args,
-	}
-
-	session, err := io.NewTransparentSession(config)
-	if err != nil {
-		return nil, err
-	}
-
-	p.session = session
-	return session, nil
-}
-
-// SendPrompt sends a prompt to the session
-func (p *QwenProvider) SendPrompt(prompt string) error {
-	if p.session == nil {
-		return fmt.Errorf("no active session")
-	}
-	return p.session.SendInput([]byte(prompt + "\n"))
-}
-
-// CloseSession closes the current session
-func (p *QwenProvider) CloseSession() error {
-	if p.session == nil {
-		return nil
-	}
-	err := p.session.Close()
-	p.session = nil
-	return err
-}
-
-// GetReadyPatterns returns patterns that indicate Qwen is ready
-func (p *QwenProvider) GetReadyPatterns() []string {
-	return []string{
-		"│ >",
-		"Type your message",
-	}
-}
-
 // getCommand returns the command and args to run Qwen
 func (p *QwenProvider) getCommand() (string, []string) {
 	config := p.Config()
-	args := []string{"chat"}
+	var args []string
 
-	// Add model if specified
 	if config.Model != "" {
 		args = append(args, "--model", config.Model)
-	} else {
-		// Default to qwen-code or similar default model
-		args = append(args, "--model", "code")
 	}
 
-	// Add temperature if specified
-	if temp, ok := config.Settings["temperature"].(float64); ok {
-		args = append(args, "--temperature", fmt.Sprintf("%.2f", temp))
-	}
-
-	// Add any additional args from config
 	args = append(args, config.Args...)
 
 	// Get the qwen command
@@ -317,17 +252,13 @@ func (p *QwenProvider) getCommand() (string, []string) {
 
 // checkQwenCLI checks if the Qwen CLI is available
 func (p *QwenProvider) checkQwenCLI() error {
-	// Try 'qwen' command
-	if _, err := exec.LookPath("qwen"); err != nil {
-		return fmt.Errorf("qwen CLI not found in PATH")
+	command := p.Config().Command
+	if command == "" {
+		command = "qwen"
 	}
-
-	// Verify it works
-	cmd := exec.Command("qwen", "--version")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("qwen CLI found but not working: %w", err)
+	if _, err := exec.LookPath(command); err != nil {
+		return fmt.Errorf("qwen CLI %q not found in PATH", command)
 	}
-
 	return nil
 }
 
@@ -341,4 +272,3 @@ func (p *QwenProvider) getQwenCommand() string {
 
 	return "qwen"
 }
-

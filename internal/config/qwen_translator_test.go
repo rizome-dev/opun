@@ -29,9 +29,7 @@ import (
 func TestQwenConfigTranslator_TranslateMCPConfig(t *testing.T) {
 	// Set test home directory
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tempDir)
 
 	translator := NewQwenConfigTranslator()
 
@@ -105,4 +103,3 @@ func TestQwenConfigTranslator_SupportsSymlinks(t *testing.T) {
 	translator := NewQwenConfigTranslator()
 	assert.True(t, translator.SupportsSymlinks())
 }
-

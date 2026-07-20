@@ -39,12 +39,7 @@ type SharedConfigManager struct {
 
 // NewSharedConfigManager creates a new shared configuration manager
 func NewSharedConfigManager() (*SharedConfigManager, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	configPath := filepath.Join(homeDir, ".opun", "shared-config.yaml")
+	configPath := filepath.Join(utils.OpunDir(), "shared-config.yaml")
 
 	manager := &SharedConfigManager{
 		configPath: configPath,
@@ -101,57 +96,20 @@ func (m *SharedConfigManager) Save() error {
 
 // CheckMCPServerInstalled checks if an MCP server is already installed
 func (m *SharedConfigManager) CheckMCPServerInstalled(serverName string) (bool, string, error) {
-	// First check our tracked status
 	for _, server := range m.config.MCPServers {
-		if server.Name == serverName && server.Installed {
-			// Verify it's actually installed
-			if server.InstallPath != "" {
-				if _, err := os.Stat(server.InstallPath); err == nil {
-					return true, server.Version, nil
-				}
-			}
-
-			// Check npm global install
-			// #nosec G204 -- server.Package comes from configuration
-			cmd := exec.Command("npm", "list", "-g", server.Package, "--json")
-			output, err := cmd.Output()
-			if err == nil {
-				var result map[string]interface{}
-				if err := json.Unmarshal(output, &result); err == nil {
-					if deps, ok := result["dependencies"].(map[string]interface{}); ok {
-						if pkg, ok := deps[server.Package].(map[string]interface{}); ok {
-							if version, ok := pkg["version"].(string); ok {
-								return true, version, nil
-							}
-						}
-					}
-				}
-			}
+		if server.Name != serverName {
+			continue
 		}
-	}
 
-	// Direct npm check
-	for _, server := range m.config.MCPServers {
-		if server.Name == serverName {
-			// #nosec G204 -- server.Package comes from configuration
-			cmd := exec.Command("npm", "list", "-g", server.Package, "--json")
-			output, err := cmd.Output()
-			if err == nil {
-				var result map[string]interface{}
-				if err := json.Unmarshal(output, &result); err == nil {
-					if deps, ok := result["dependencies"].(map[string]interface{}); ok {
-						if pkg, ok := deps[server.Package].(map[string]interface{}); ok {
-							if version, ok := pkg["version"].(string); ok {
-								// Update our tracking
-								_ = m.UpdateMCPServerStatus(serverName, true, version)
-								return true, version, nil
-							}
-						}
-					}
-				}
-			}
-			break
+		if _, err := exec.LookPath(server.Command); err != nil {
+			return false, "", nil
 		}
+
+		version := server.Version
+		if version == "" {
+			version = "on-demand"
+		}
+		return true, version, nil
 	}
 
 	return false, "", nil
@@ -268,14 +226,23 @@ func (m *SharedConfigManager) writeProviderConfig(translator core.ProviderConfig
 	if err != nil {
 		return fmt.Errorf("failed to marshal new config: %w", err)
 	}
-	
+
 	var newConfig map[string]interface{}
 	if err := json.Unmarshal(newConfigData, &newConfig); err != nil {
 		return fmt.Errorf("failed to unmarshal new config: %w", err)
 	}
 
-	// Merge new config into existing config (preserving existing fields)
+	// Merge new config into existing config, deep-merging map values one
+	// level so unmanaged entries (e.g. user-added mcpServers) survive
 	for key, value := range newConfig {
+		newMap, newIsMap := value.(map[string]interface{})
+		existingMap, existingIsMap := existingConfig[key].(map[string]interface{})
+		if newIsMap && existingIsMap {
+			for k, v := range newMap {
+				existingMap[k] = v
+			}
+			continue
+		}
 		existingConfig[key] = value
 	}
 
@@ -311,27 +278,27 @@ func (m *SharedConfigManager) getDefaultConfig() *core.SharedConfig {
 				Name:     "memory",
 				Package:  "@modelcontextprotocol/server-memory",
 				Command:  "npx",
-				Args:     []string{"@modelcontextprotocol/server-memory"},
+				Args:     []string{"-y", "@modelcontextprotocol/server-memory"},
 				Required: true,
 			},
 			{
 				Name:     "sequential-thinking",
 				Package:  "@modelcontextprotocol/server-sequential-thinking",
 				Command:  "npx",
-				Args:     []string{"@modelcontextprotocol/server-sequential-thinking"},
+				Args:     []string{"-y", "@modelcontextprotocol/server-sequential-thinking"},
 				Required: true,
 			},
 			{
 				Name:    "filesystem",
 				Package: "@modelcontextprotocol/server-filesystem",
 				Command: "npx",
-				Args:    []string{"@modelcontextprotocol/server-filesystem", "~/Documents"},
+				Args:    []string{"-y", "@modelcontextprotocol/server-filesystem", "~/Documents"},
 			},
 			{
 				Name:    "context7",
 				Package: "@upstash/context7-mcp",
 				Command: "npx",
-				Args:    []string{"@upstash/context7-mcp"},
+				Args:    []string{"-y", "@upstash/context7-mcp"},
 				// Context7 is free and doesn't require an API key
 			},
 		},

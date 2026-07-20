@@ -93,9 +93,9 @@ func TestSimpleRouter_Route(t *testing.T) {
 		_, err := router.Route(task, agents)
 		assert.Error(t, err)
 		// Error could be either "no suitable agent" or "no capable agents"
-		assert.True(t, 
-			contains(err.Error(), "no suitable agent") || 
-			contains(err.Error(), "no capable agents"),
+		assert.True(t,
+			contains(err.Error(), "no suitable agent") ||
+				contains(err.Error(), "no capable agents"),
 			"Expected error to contain 'no suitable agent' or 'no capable agents', got: %v", err)
 
 		// Reset
@@ -167,7 +167,7 @@ func TestSimpleRouter_Score(t *testing.T) {
 
 		score := router.Score(task, agent)
 		assert.Equal(t, 0.0, score)
-		
+
 		agent.mu.Lock()
 		agent.canHandle = true
 		agent.mu.Unlock()
@@ -226,7 +226,7 @@ func TestSimpleRouter_Learn(t *testing.T) {
 
 		// Stats should be updated
 		assert.NotEqual(t, initialStats, updatedStats)
-		
+
 		// Check success count increased
 		agentStats, ok := updatedStats[agent.Name()].(map[string]interface{})
 		if ok {
@@ -296,7 +296,7 @@ func TestSimpleRouter_GetStats(t *testing.T) {
 	t.Run("Stats after routing", func(t *testing.T) {
 		agent1 := NewMockSubAgent("agent1")
 		agent2 := NewMockSubAgent("agent2")
-		
+
 		task := core.SubAgentTask{ID: "task1"}
 		agents := []core.SubAgent{agent1, agent2}
 
@@ -314,7 +314,7 @@ func TestSimpleRouter_GetStats(t *testing.T) {
 
 		stats := router.GetStats()
 		assert.NotNil(t, stats)
-		
+
 		// Should have stats for agent1
 		agentsMap, ok := stats["agents"].(map[string]interface{})
 		assert.True(t, ok)
@@ -410,7 +410,7 @@ func (r *CapabilityRouter) scoreByCapabilities(task core.SubAgentTask, agent cor
 
 	score := 0.0
 	capabilities := agent.GetCapabilities()
-	
+
 	// Check how many task requirements the agent can handle
 	for key := range task.Context {
 		for _, cap := range capabilities {
@@ -477,7 +477,7 @@ func TestRouterFallback(t *testing.T) {
 // Benchmark tests
 func BenchmarkRouter_Route(b *testing.B) {
 	router := NewSimpleRouter()
-	
+
 	// Create many agents
 	agents := make([]core.SubAgent, 100)
 	for i := 0; i < 100; i++ {
@@ -505,7 +505,7 @@ func BenchmarkRouter_Score(b *testing.B) {
 	router := NewSimpleRouter()
 	agent := NewMockSubAgent("bench-agent")
 	agent.capabilities = []string{"cap1", "cap2", "cap3"}
-	
+
 	task := core.SubAgentTask{
 		ID: "bench-task",
 		Context: map[string]interface{}{
@@ -522,7 +522,7 @@ func BenchmarkRouter_Score(b *testing.B) {
 func BenchmarkRouter_Learn(b *testing.B) {
 	router := NewSimpleRouter()
 	agent := NewMockSubAgent("bench-agent")
-	
+
 	task := core.SubAgentTask{ID: "bench-task"}
 	result := &core.SubAgentResult{
 		TaskID:    task.ID,

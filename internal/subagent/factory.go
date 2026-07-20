@@ -42,7 +42,7 @@ func (f *Factory) RegisterProvider(provider core.Provider) error {
 	if provider == nil {
 		return fmt.Errorf("provider cannot be nil")
 	}
-	
+
 	f.providers[provider.Type()] = provider
 	return nil
 }
@@ -52,40 +52,40 @@ func (f *Factory) CreateAdapter(config core.SubAgentConfig) (core.SubAgentAdapte
 	if config.Provider == "" {
 		return nil, fmt.Errorf("provider type not specified in config")
 	}
-	
+
 	var adapter core.SubAgentAdapter
-	
+
 	switch config.Provider {
 	case core.ProviderTypeClaude:
 		adapter = claude.NewClaudeAdapter(config)
-		
+
 	case core.ProviderTypeGemini:
 		adapter = gemini.NewGeminiAdapter(config)
-		
+
 	case core.ProviderTypeQwen:
 		adapter = qwen.NewQwenAdapter(config)
-		
+
 	default:
 		return nil, fmt.Errorf("unsupported provider type: %s", config.Provider)
 	}
-	
+
 	// Initialize the adapter
 	if err := adapter.Initialize(config); err != nil {
 		return nil, fmt.Errorf("failed to initialize adapter: %w", err)
 	}
-	
+
 	// Associate provider if available
 	if provider, exists := f.providers[config.Provider]; exists {
 		if err := adapter.InitializeProvider(provider); err != nil {
 			return nil, fmt.Errorf("failed to initialize provider: %w", err)
 		}
 	}
-	
+
 	// Validate the adapter
 	if err := adapter.Validate(); err != nil {
 		return nil, fmt.Errorf("adapter validation failed: %w", err)
 	}
-	
+
 	return adapter, nil
 }
 
@@ -95,7 +95,7 @@ func (f *Factory) CreateSubAgent(config core.SubAgentConfig) (core.SubAgent, err
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// The adapter implements the SubAgent interface
 	return adapter, nil
 }
@@ -114,13 +114,13 @@ func (f *Factory) GetProviderCapabilities(providerType core.ProviderType) (core.
 	switch providerType {
 	case core.ProviderTypeClaude:
 		return core.SubAgentTypeDeclarative, nil
-		
+
 	case core.ProviderTypeGemini:
 		return core.SubAgentTypeProgrammatic, nil
-		
+
 	case core.ProviderTypeQwen:
 		return core.SubAgentTypeWorkflow, nil // Custom implementation via workflows
-		
+
 	default:
 		return "", fmt.Errorf("unknown provider type: %s", providerType)
 	}
@@ -131,23 +131,23 @@ func (f *Factory) CreateFromProvider(provider core.Provider) ([]core.SubAgent, e
 	if provider == nil {
 		return nil, fmt.Errorf("provider cannot be nil")
 	}
-	
+
 	// Check if provider supports subagents
 	capable, ok := provider.(core.SubAgentCapable)
 	if !ok {
 		return nil, fmt.Errorf("provider %s does not support subagents", provider.Name())
 	}
-	
+
 	if !capable.SupportsSubAgents() {
 		return nil, fmt.Errorf("provider %s has subagents disabled", provider.Name())
 	}
-	
+
 	// Get subagent configurations from provider
 	configs, err := capable.ListSubAgents()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list subagents: %w", err)
 	}
-	
+
 	// Create subagents from configurations
 	var agents []core.SubAgent
 	for _, config := range configs {
@@ -155,16 +155,16 @@ func (f *Factory) CreateFromProvider(provider core.Provider) ([]core.SubAgent, e
 		if config.Provider == "" {
 			config.Provider = provider.Type()
 		}
-		
+
 		agent, err := f.CreateSubAgent(config)
 		if err != nil {
 			// Log error but continue with other agents
 			continue
 		}
-		
+
 		agents = append(agents, agent)
 	}
-	
+
 	return agents, nil
 }
 
@@ -173,32 +173,32 @@ func (f *Factory) CreateDefaultConfigs() []core.SubAgentConfig {
 	return []core.SubAgentConfig{
 		// Claude: Declarative research agent
 		{
-			Name:        "claude-researcher",
-			Type:        core.SubAgentTypeDeclarative,
-			Description: "Research and documentation agent using Claude's Task tool",
-			Provider:    core.ProviderTypeClaude,
-			Model:       "claude-3-opus",
-			Strategy:    core.DelegationAutomatic,
-			Context:     []string{"research", "documentation", "analysis", "report"},
+			Name:         "claude-researcher",
+			Type:         core.SubAgentTypeDeclarative,
+			Description:  "Research and documentation agent using Claude's Task tool",
+			Provider:     core.ProviderTypeClaude,
+			Model:        "opus",
+			Strategy:     core.DelegationAutomatic,
+			Context:      []string{"research", "documentation", "analysis", "report"},
 			Capabilities: []string{"research", "writing", "analysis", "summarization"},
-			Priority:    8,
-			Timeout:     300,
+			Priority:     8,
+			Timeout:      300,
 			OutputFormat: "markdown",
 		},
-		
+
 		// Gemini: Programmatic code generator
 		{
-			Name:        "gemini-coder",
-			Type:        core.SubAgentTypeProgrammatic,
-			Description: "Code generation and implementation agent using Gemini",
-			Provider:    core.ProviderTypeGemini,
-			Model:       "gemini-1.5-flash",
-			Strategy:    core.DelegationAutomatic,
-			Context:     []string{"code", "implementation", "programming", "development"},
+			Name:         "gemini-coder",
+			Type:         core.SubAgentTypeProgrammatic,
+			Description:  "Code generation and implementation agent using Gemini",
+			Provider:     core.ProviderTypeGemini,
+			Model:        "auto",
+			Strategy:     core.DelegationAutomatic,
+			Context:      []string{"code", "implementation", "programming", "development"},
 			Capabilities: []string{"code_generation", "implementation", "testing", "debugging"},
-			Priority:    7,
-			Timeout:     180,
-			Interactive: false,
+			Priority:     7,
+			Timeout:      180,
+			Interactive:  false,
 			OutputFormat: "json",
 			ProviderConfig: map[string]interface{}{
 				"temperature":    0.3,
@@ -206,22 +206,22 @@ func (f *Factory) CreateDefaultConfigs() []core.SubAgentConfig {
 				"max_iterations": 3,
 			},
 		},
-		
+
 		// Qwen: Specialized code review agent
 		{
-			Name:        "qwen-reviewer",
-			Type:        core.SubAgentTypeWorkflow,
-			Description: "Code review and refactoring specialist using Qwen",
-			Provider:    core.ProviderTypeQwen,
-			Model:       "qwen-coder-32b-instruct",
-			Strategy:    core.DelegationExplicit,
-			Context:     []string{"review", "refactor", "optimize", "quality"},
+			Name:         "qwen-reviewer",
+			Type:         core.SubAgentTypeWorkflow,
+			Description:  "Code review and refactoring specialist using Qwen",
+			Provider:     core.ProviderTypeQwen,
+			Model:        "qwen3-coder-plus",
+			Strategy:     core.DelegationExplicit,
+			Context:      []string{"review", "refactor", "optimize", "quality"},
 			Capabilities: []string{"code_review", "refactoring", "optimization", "best_practices"},
-			Priority:    9,
-			Timeout:     240,
-			Interactive: false,
+			Priority:     9,
+			Timeout:      240,
+			Interactive:  false,
 			OutputFormat: "text",
-			Tools:       []string{"linter", "formatter", "analyzer"},
+			Tools:        []string{"linter", "formatter", "analyzer"},
 		},
 	}
 }

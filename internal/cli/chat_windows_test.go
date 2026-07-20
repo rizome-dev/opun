@@ -13,18 +13,9 @@ import (
 )
 
 func TestRunChat_Windows(t *testing.T) {
-	// Save original environment
-	oldHome := os.Getenv("HOME")
-	oldUserProfile := os.Getenv("USERPROFILE")
-	defer func() {
-		os.Setenv("HOME", oldHome)
-		os.Setenv("USERPROFILE", oldUserProfile)
-	}()
-
-	// Create a temporary home directory for testing
 	tempHome := t.TempDir()
-	os.Setenv("HOME", tempHome)
-	os.Setenv("USERPROFILE", tempHome) // Windows uses USERPROFILE
+	t.Setenv("HOME", tempHome)
+	t.Setenv("USERPROFILE", tempHome)
 
 	// Create required directories
 	opunDir := filepath.Join(tempHome, ".opun")
@@ -123,8 +114,8 @@ func TestWindowsChatSpecificFeatures(t *testing.T) {
 
 		// Set up minimal environment
 		tempHome := t.TempDir()
-		os.Setenv("HOME", tempHome)
-		os.Setenv("USERPROFILE", tempHome)
+		t.Setenv("HOME", tempHome)
+		t.Setenv("USERPROFILE", tempHome)
 
 		opunDir := filepath.Join(tempHome, ".opun")
 		require.NoError(t, os.MkdirAll(filepath.Join(opunDir, "actions"), 0755))
@@ -167,8 +158,8 @@ func TestChatCommandPathResolution(t *testing.T) {
 
 	// Set up environment
 	tempHome := t.TempDir()
-	os.Setenv("HOME", tempHome)
-	os.Setenv("USERPROFILE", tempHome)
+	t.Setenv("HOME", tempHome)
+	t.Setenv("USERPROFILE", tempHome)
 
 	opunDir := filepath.Join(tempHome, ".opun")
 	require.NoError(t, os.MkdirAll(filepath.Join(opunDir, "actions"), 0755))

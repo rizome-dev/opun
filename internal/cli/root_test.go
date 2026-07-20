@@ -144,8 +144,7 @@ func TestInitConfig(t *testing.T) {
 		err := initConfig("")
 		assert.NoError(t, err)
 
-		// Should use custom directory
-		// Again, testing viper internals is difficult
+		assert.DirExists(t, customDir)
 	})
 }
 

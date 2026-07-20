@@ -27,9 +27,9 @@ import (
 
 // SimpleRouter implements a basic task routing strategy
 type SimpleRouter struct {
-	mu        sync.RWMutex
-	stats     map[string]*agentStats
-	weights   map[string]float64
+	mu      sync.RWMutex
+	stats   map[string]*agentStats
+	weights map[string]float64
 }
 
 // agentStats tracks agent performance
@@ -54,7 +54,7 @@ func (r *SimpleRouter) Route(task core.SubAgentTask, agents []core.SubAgent) (co
 	if len(agents) == 0 {
 		return nil, fmt.Errorf("no agents available")
 	}
-	
+
 	// Score all agents
 	scores := make(map[core.SubAgent]float64)
 	for _, agent := range agents {
@@ -62,26 +62,26 @@ func (r *SimpleRouter) Route(task core.SubAgentTask, agents []core.SubAgent) (co
 			scores[agent] = r.Score(task, agent)
 		}
 	}
-	
+
 	if len(scores) == 0 {
 		return nil, fmt.Errorf("no capable agents found for task %s", task.Name)
 	}
-	
+
 	// Sort agents by score
 	type agentScore struct {
 		agent core.SubAgent
 		score float64
 	}
-	
+
 	var sortedAgents []agentScore
 	for agent, score := range scores {
 		sortedAgents = append(sortedAgents, agentScore{agent, score})
 	}
-	
+
 	sort.Slice(sortedAgents, func(i, j int) bool {
 		return sortedAgents[i].score > sortedAgents[j].score
 	})
-	
+
 	return sortedAgents[0].agent, nil
 }
 
@@ -91,28 +91,28 @@ func (r *SimpleRouter) Score(task core.SubAgentTask, agent core.SubAgent) float6
 	if !agent.CanHandle(task) {
 		return 0.0
 	}
-	
+
 	score := 0.0
 	config := agent.Config()
-	
+
 	// Base score from priority
 	score += float64(config.Priority) * 10
-	
+
 	// Context matching score
 	contextScore := r.calculateContextScore(task, config.Context)
 	score += contextScore * 20
-	
+
 	// Capability matching score
 	capScore := r.calculateCapabilityScore(task, agent.GetCapabilities())
 	score += capScore * 30
-	
+
 	// Performance history score
 	r.mu.RLock()
 	if stats, exists := r.stats[agent.Name()]; exists {
 		if stats.totalTasks > 0 {
 			successRate := float64(stats.successTasks) / float64(stats.totalTasks)
 			score += successRate * 25
-			
+
 			// Penalize slow agents
 			if stats.avgTime > 0 {
 				speedScore := 100.0 / stats.avgTime
@@ -124,19 +124,19 @@ func (r *SimpleRouter) Score(task core.SubAgentTask, agent core.SubAgent) float6
 		}
 	}
 	r.mu.RUnlock()
-	
+
 	// Provider preference (if specified in task context)
 	if preferredProvider, ok := task.Context["preferred_provider"].(string); ok {
 		if string(agent.Provider()) == preferredProvider {
 			score += 10
 		}
 	}
-	
+
 	// Parallel execution bonus
 	if agent.SupportsParallel() && task.Priority > 5 {
 		score += 5
 	}
-	
+
 	return score
 }
 
@@ -144,26 +144,26 @@ func (r *SimpleRouter) Score(task core.SubAgentTask, agent core.SubAgent) float6
 func (r *SimpleRouter) Learn(task core.SubAgentTask, agent core.SubAgent, result *core.SubAgentResult) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	// Initialize stats if needed
 	if _, exists := r.stats[agent.Name()]; !exists {
 		r.stats[agent.Name()] = &agentStats{}
 	}
-	
+
 	stats := r.stats[agent.Name()]
 	stats.totalTasks++
-	
+
 	if result.Status == core.StatusCompleted {
 		stats.successTasks++
 	} else if result.Status == core.StatusFailed {
 		stats.failedTasks++
 	}
-	
+
 	// Update average time
 	duration := result.Duration.Seconds()
 	stats.totalTime += duration
 	stats.avgTime = stats.totalTime / float64(stats.totalTasks)
-	
+
 	// Update weights based on performance
 	successRate := float64(stats.successTasks) / float64(stats.totalTasks)
 	r.weights[agent.Name()] = successRate
@@ -173,9 +173,9 @@ func (r *SimpleRouter) Learn(task core.SubAgentTask, agent core.SubAgent, result
 func (r *SimpleRouter) GetStats() map[string]interface{} {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	stats := make(map[string]interface{})
-	
+
 	// Copy agent stats
 	agentStats := make(map[string]interface{})
 	for name, stat := range r.stats {
@@ -188,14 +188,14 @@ func (r *SimpleRouter) GetStats() map[string]interface{} {
 		}
 	}
 	stats["agents"] = agentStats
-	
+
 	// Copy weights
 	weights := make(map[string]float64)
 	for name, weight := range r.weights {
 		weights[name] = weight
 	}
 	stats["weights"] = weights
-	
+
 	return stats
 }
 
@@ -204,7 +204,7 @@ func (r *SimpleRouter) calculateContextScore(task core.SubAgentTask, agentContex
 	if len(agentContextPatterns) == 0 {
 		return 0.5 // Neutral score if no patterns defined
 	}
-	
+
 	// Combine task description and context into searchable text
 	taskText := strings.ToLower(task.Description + " " + task.Name)
 	for _, value := range task.Context {
@@ -212,7 +212,7 @@ func (r *SimpleRouter) calculateContextScore(task core.SubAgentTask, agentContex
 			taskText += " " + strings.ToLower(str)
 		}
 	}
-	
+
 	matches := 0
 	for _, pattern := range agentContextPatterns {
 		pattern = strings.ToLower(pattern)
@@ -220,7 +220,7 @@ func (r *SimpleRouter) calculateContextScore(task core.SubAgentTask, agentContex
 			matches++
 		}
 	}
-	
+
 	return float64(matches) / float64(len(agentContextPatterns))
 }
 
@@ -229,10 +229,10 @@ func (r *SimpleRouter) calculateCapabilityScore(task core.SubAgentTask, agentCap
 	if len(agentCapabilities) == 0 {
 		return 0.5 // Neutral score if no capabilities defined
 	}
-	
+
 	// Extract required capabilities from task
 	requiredCaps := make(map[string]bool)
-	
+
 	// Check task constraints for capability hints
 	for _, constraint := range task.Constraints {
 		constraint = strings.ToLower(constraint)
@@ -242,7 +242,7 @@ func (r *SimpleRouter) calculateCapabilityScore(task core.SubAgentTask, agentCap
 			}
 		}
 	}
-	
+
 	// Check task description for capability keywords
 	taskText := strings.ToLower(task.Description + " " + task.Name)
 	for _, cap := range agentCapabilities {
@@ -250,11 +250,11 @@ func (r *SimpleRouter) calculateCapabilityScore(task core.SubAgentTask, agentCap
 			requiredCaps[cap] = true
 		}
 	}
-	
+
 	if len(requiredCaps) == 0 {
 		return 0.5 // No specific requirements found
 	}
-	
+
 	// Calculate match percentage
 	matches := 0
 	for cap := range requiredCaps {
@@ -265,7 +265,7 @@ func (r *SimpleRouter) calculateCapabilityScore(task core.SubAgentTask, agentCap
 			}
 		}
 	}
-	
+
 	return float64(matches) / float64(len(requiredCaps))
 }
 
@@ -273,7 +273,7 @@ func (r *SimpleRouter) calculateCapabilityScore(task core.SubAgentTask, agentCap
 func (r *SimpleRouter) Reset() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	r.stats = make(map[string]*agentStats)
 	r.weights = make(map[string]float64)
 }

@@ -22,7 +22,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/rizome-dev/opun/internal/config"
 	"github.com/rizome-dev/opun/pkg/core"
@@ -45,109 +44,47 @@ func NewSharedMCPInstaller() (*SharedMCPInstaller, error) {
 	}, nil
 }
 
-// InstallServers installs the selected MCP servers, checking for existing installations
+// InstallServers marks the selected MCP servers as enabled; servers run on
+// demand via their configured command (npx -y fetches packages as needed)
 func (i *SharedMCPInstaller) InstallServers(ctx context.Context, serverNames []string) error {
-	fmt.Println("🔍 Checking for existing MCP server installations...")
+	fmt.Println("🔍 Configuring MCP servers...")
 
-	toInstall := []string{}
 	for _, name := range serverNames {
-		installed, version, err := i.configManager.CheckMCPServerInstalled(name)
+		available, version, err := i.configManager.CheckMCPServerInstalled(name)
 		if err != nil {
 			fmt.Printf("⚠️  Error checking %s: %v\n", name, err)
-			toInstall = append(toInstall, name)
 			continue
 		}
 
-		if installed {
-			fmt.Printf("✅ %s is already installed (version: %s)\n", name, version)
-			// Update the config to reflect it's installed
-			i.configManager.UpdateMCPServerStatus(name, true, version)
-		} else {
-			fmt.Printf("❌ %s needs to be installed\n", name)
-			toInstall = append(toInstall, name)
-		}
-	}
-
-	if len(toInstall) == 0 {
-		fmt.Println("✨ All selected MCP servers are already installed!")
-		return nil
-	}
-
-	// Check if npm is available
-	if !i.hasNPM() {
-		return fmt.Errorf("npm is required to install MCP servers. Please install Node.js and npm")
-	}
-
-	fmt.Printf("\n📦 Installing %d MCP servers...\n", len(toInstall))
-
-	servers := i.configManager.GetMCPServers()
-	for idx, name := range toInstall {
-		fmt.Printf("  [%d/%d] Installing %s", idx+1, len(toInstall), name)
-
-		// Find the server configuration
-		var server *core.SharedMCPServer
-		for _, s := range servers {
-			if s.Name == name {
-				server = &s
-				break
-			}
-		}
-
-		if server == nil {
-			fmt.Printf(" ❌ (server not found in configuration)\n")
+		if !available {
+			fmt.Printf("⚠️  %s: command not found on PATH, skipping\n", name)
 			continue
 		}
 
-		// Install the server
-		if err := i.installSingleServer(ctx, *server); err != nil {
-			fmt.Printf(" ❌ (failed: %v)\n", err)
-			// Mark as failed in config
-			i.configManager.UpdateMCPServerStatus(name, false, "")
+		if err := i.configManager.UpdateMCPServerStatus(name, true, version); err != nil {
+			fmt.Printf("⚠️  Failed to update status for %s: %v\n", name, err)
 			continue
 		}
-
-		// Verify installation and get version
-		installed, version, _ := i.configManager.CheckMCPServerInstalled(name)
-		if installed {
-			fmt.Printf(" ✅ (version: %s)\n", version)
-			i.configManager.UpdateMCPServerStatus(name, true, version)
-		} else {
-			fmt.Printf(" ⚠️ (installed but couldn't verify)\n")
-		}
+		fmt.Printf("✅ %s configured (version: %s)\n", name, version)
 	}
 
 	return nil
 }
 
-// installSingleServer installs a single MCP server
-func (i *SharedMCPInstaller) installSingleServer(ctx context.Context, server core.SharedMCPServer) error {
-	// Create a context with timeout if not already set
-	installCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
-
-	// Install the package globally
-	// #nosec G204 -- server.Package comes from configuration and is validated
-	cmd := exec.CommandContext(installCtx, "npm", "install", "-g", server.Package)
-
-	// Capture output for debugging
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("npm install failed: %w\nOutput: %s", err, string(output))
-	}
-
-	return nil
-}
-
-// SyncConfigurations syncs the shared configuration to all providers
+// SyncConfigurations syncs the shared configuration to installed providers
 func (i *SharedMCPInstaller) SyncConfigurations(providers []string) error {
 	fmt.Println("\n🔄 Syncing configuration to providers...")
 
 	for _, provider := range providers {
+		if _, err := exec.LookPath(provider); err != nil {
+			fmt.Printf("  Skipping %s (CLI not installed)\n", provider)
+			continue
+		}
+
 		fmt.Printf("  Syncing to %s...", provider)
 
 		if err := i.configManager.SyncToProvider(provider); err != nil {
 			fmt.Printf(" ❌ (failed: %v)\n", err)
-			// Continue with other providers
 		} else {
 			fmt.Printf(" ✅\n")
 		}
@@ -180,12 +117,6 @@ func (i *SharedMCPInstaller) ValidateEnvironmentVariables() map[string][]string 
 	}
 
 	return missing
-}
-
-// hasNPM checks if npm is available
-func (i *SharedMCPInstaller) hasNPM() bool {
-	cmd := exec.Command("npm", "--version")
-	return cmd.Run() == nil
 }
 
 // GetInstalledServers returns a list of all installed MCP servers

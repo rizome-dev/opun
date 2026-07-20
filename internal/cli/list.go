@@ -18,6 +18,7 @@ package cli
 
 import (
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"os"
 	"path/filepath"
 	"strings"
@@ -88,12 +89,7 @@ func ListCmd() *cobra.Command {
 
 // showWorkflows lists all available workflows
 func showWorkflows() error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	workflowDir := filepath.Join(home, ".opun", "workflows")
+	workflowDir := filepath.Join(utils.OpunDir(), "workflows")
 
 	// Check if directory exists
 	if _, err := os.Stat(workflowDir); os.IsNotExist(err) {
@@ -152,12 +148,7 @@ func showWorkflows() error {
 
 // showPrompts lists all available prompts
 func showPrompts() error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	gardenPath := filepath.Join(home, ".opun", "promptgarden")
+	gardenPath := filepath.Join(utils.OpunDir(), "promptgarden")
 
 	// Check if garden exists
 	if _, err := os.Stat(gardenPath); os.IsNotExist(err) {
@@ -217,12 +208,7 @@ func showPrompts() error {
 
 // showActions lists all available actions
 func showActions() error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	actionsDir := filepath.Join(home, ".opun", "actions")
+	actionsDir := filepath.Join(utils.OpunDir(), "actions")
 
 	// Check if directory exists
 	if _, err := os.Stat(actionsDir); os.IsNotExist(err) {

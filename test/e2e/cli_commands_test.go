@@ -1,3 +1,5 @@
+//go:build e2e
+
 package e2e
 
 // Copyright (C) 2025 Rizome Labs, Inc.
@@ -38,9 +40,7 @@ func TestCLICommands(t *testing.T) {
 
 	// Set up test environment
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tempDir)
 
 	t.Run("Root Command", func(t *testing.T) {
 		cmd := cli.RootCmd()
@@ -166,9 +166,7 @@ func TestWorkflowRun(t *testing.T) {
 
 	// Set up test environment
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tempDir)
 
 	// Create .opun directories
 	opunDir := filepath.Join(tempDir, ".opun")

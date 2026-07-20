@@ -166,12 +166,7 @@ func addWorkflow(path, name string) error {
 	}
 
 	// Get workflow directory first
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	workflowDir := filepath.Join(home, ".opun", "workflows")
+	workflowDir := filepath.Join(utils.OpunDir(), "workflows")
 
 	// Parse workflow to validate it
 	parser := workflow.NewParser(workflowDir)
@@ -209,7 +204,7 @@ func addWorkflow(path, name string) error {
 	// Save config
 	configPath := viper.ConfigFileUsed()
 	if configPath == "" {
-		configPath = filepath.Join(home, ".opun", "config.yaml")
+		configPath = filepath.Join(utils.OpunDir(), "config.yaml")
 	}
 
 	if err := viper.WriteConfigAs(configPath); err != nil {
@@ -228,12 +223,7 @@ func addPrompt(path, name string) error {
 	}
 
 	// Get prompt garden
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	gardenPath := filepath.Join(home, ".opun", "promptgarden")
+	gardenPath := filepath.Join(utils.OpunDir(), "promptgarden")
 	garden, err := promptgarden.NewGarden(gardenPath)
 	if err != nil {
 		return fmt.Errorf("failed to access prompt garden: %w", err)
@@ -293,12 +283,7 @@ func addActionFromFile(path, name string) error {
 	}
 
 	// Get tools directory
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	actionsDir := filepath.Join(home, ".opun", "actions")
+	actionsDir := filepath.Join(utils.OpunDir(), "actions")
 
 	// Create action loader
 	loader := tools.NewLoader(actionsDir)

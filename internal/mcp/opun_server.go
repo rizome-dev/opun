@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -120,8 +121,7 @@ func (s *OpunMCPServer) handleTools(w http.ResponseWriter, r *http.Request) {
 	// NOTE: Prompts are now exposed via the prompts API, not as tools
 
 	// Add tools from ~/.opun/tools
-	home, _ := os.UserHomeDir()
-	toolsDir := filepath.Join(home, ".opun", "tools")
+	toolsDir := filepath.Join(utils.OpunDir(), "tools")
 	if entries, err := os.ReadDir(toolsDir); err == nil {
 		for _, entry := range entries {
 			if !entry.IsDir() && (strings.HasSuffix(entry.Name(), ".yaml") || strings.HasSuffix(entry.Name(), ".yml")) {
@@ -345,8 +345,7 @@ func (s *OpunMCPServer) executeMCPTool(tool string, args map[string]interface{})
 	toolName := strings.TrimPrefix(tool, "tool_")
 
 	// Load tool definition
-	home, _ := os.UserHomeDir()
-	toolsDir := filepath.Join(home, ".opun", "tools")
+	toolsDir := filepath.Join(utils.OpunDir(), "tools")
 	toolPath := filepath.Join(toolsDir, toolName+".yaml")
 
 	// Try .yml if .yaml doesn't exist
@@ -394,13 +393,8 @@ func (s *OpunMCPServer) buildPromptParameters(p core.Prompt) map[string]interfac
 
 // writeConfig writes the MCP server configuration
 func (s *OpunMCPServer) writeConfig() error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
 	// Create opun MCP config directory
-	configDir := filepath.Join(home, ".opun", "mcp")
+	configDir := filepath.Join(utils.OpunDir(), "mcp")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		if os.IsPermission(err) {
 			return fmt.Errorf("permission denied: cannot create %s\nTry: sudo chown -R $USER ~/.opun", configDir)

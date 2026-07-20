@@ -17,11 +17,17 @@ package providers
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import (
+	"os/exec"
 	"testing"
 
 	"github.com/rizome-dev/opun/pkg/core"
 	"github.com/stretchr/testify/assert"
 )
+
+func cliOnPath(name string) bool {
+	_, err := exec.LookPath(name)
+	return err == nil
+}
 
 func TestProviderFactory_CreateProvider(t *testing.T) {
 	factory := NewProviderFactory()
@@ -40,7 +46,7 @@ func TestProviderFactory_CreateProvider(t *testing.T) {
 				Command: "claude",
 			},
 			wantType:    core.ProviderTypeClaude,
-			shouldError: true, // Will error because claude command doesn't exist in test
+			shouldError: !cliOnPath("claude"),
 		},
 		{
 			name: "Create Gemini provider",
@@ -50,7 +56,7 @@ func TestProviderFactory_CreateProvider(t *testing.T) {
 				Command: "gemini",
 			},
 			wantType:    core.ProviderTypeGemini,
-			shouldError: true, // Will error because gemini command doesn't exist in test
+			shouldError: !cliOnPath("gemini"),
 		},
 		{
 			name: "Create Qwen provider",
@@ -60,7 +66,7 @@ func TestProviderFactory_CreateProvider(t *testing.T) {
 				Command: "qwen",
 			},
 			wantType:    core.ProviderTypeQwen,
-			shouldError: true, // Will error because qwen command doesn't exist in test
+			shouldError: !cliOnPath("qwen"),
 		},
 		{
 			name: "Create Mock provider",
@@ -115,23 +121,23 @@ func TestProviderFactory_CreateProviderFromType(t *testing.T) {
 			providerName: "test-claude",
 			wantCommand:  "claude",
 			wantModel:    "sonnet",
-			shouldError:  true, // Will error due to validation
+			shouldError:  !cliOnPath("claude"),
 		},
 		{
 			name:         "Create Gemini from type",
 			providerType: "gemini",
 			providerName: "test-gemini",
 			wantCommand:  "gemini",
-			wantModel:    "gemini-pro",
-			shouldError:  true, // Will error due to validation
+			wantModel:    "auto",
+			shouldError:  !cliOnPath("gemini"),
 		},
 		{
 			name:         "Create Qwen from type",
 			providerType: "qwen",
 			providerName: "test-qwen",
 			wantCommand:  "qwen",
-			wantModel:    "code",
-			shouldError:  true, // Will error due to validation
+			wantModel:    "qwen3-coder-plus",
+			shouldError:  !cliOnPath("qwen"),
 		},
 		{
 			name:         "Create Mock from type",
@@ -168,8 +174,8 @@ func TestGetDefaultModel(t *testing.T) {
 		wantModel    string
 	}{
 		{"claude", "sonnet"},
-		{"gemini", "gemini-pro"},
-		{"qwen", "code"},
+		{"gemini", "auto"},
+		{"qwen", "qwen3-coder-plus"},
 		{"unknown", ""},
 	}
 
@@ -203,4 +209,3 @@ func TestGetDefaultFeatures(t *testing.T) {
 		})
 	}
 }
-

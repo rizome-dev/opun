@@ -19,6 +19,7 @@ package cli
 import (
 	"bufio"
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"io"
 	"os"
 	"path/filepath"
@@ -368,12 +369,7 @@ func handleInteractiveWorkflowCreate() error {
 	}
 
 	// Get workflows directory
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	workflowsDir := filepath.Join(home, ".opun", "workflows")
+	workflowsDir := filepath.Join(utils.OpunDir(), "workflows")
 	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
 		return fmt.Errorf("failed to create workflows directory: %w", err)
 	}
@@ -392,12 +388,12 @@ func handleInteractiveWorkflowCreate() error {
 }
 
 func createInteractiveAgent(agentID string) (map[string]interface{}, error) {
-	provider, err := Prompt("Enter agent provider (claude/gemini):")
+	provider, err := Prompt("Enter agent provider (claude/gemini/qwen):")
 	if err != nil {
 		return nil, err
 	}
 
-	model, err := Prompt("Enter agent model (e.g., sonnet, opus, flash):")
+	model, err := Prompt("Enter agent model (e.g., sonnet, opus, auto, qwen3-coder-plus):")
 	if err != nil {
 		return nil, err
 	}
@@ -438,12 +434,7 @@ func handleInteractivePromptCreate() error {
 	}
 
 	// Get prompt garden
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	gardenPath := filepath.Join(home, ".opun", "promptgarden")
+	gardenPath := filepath.Join(utils.OpunDir(), "promptgarden")
 	garden, err := promptgarden.NewGarden(gardenPath)
 	if err != nil {
 		return fmt.Errorf("failed to access prompt garden: %w", err)
@@ -495,12 +486,7 @@ func handleInteractiveToolCreate() error {
 	}
 
 	// Get tools directory
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	toolsDir := filepath.Join(home, ".opun", "tools")
+	toolsDir := filepath.Join(utils.OpunDir(), "tools")
 	if err := os.MkdirAll(toolsDir, 0755); err != nil {
 		return fmt.Errorf("failed to create tools directory: %w", err)
 	}
@@ -551,12 +537,7 @@ func handleInteractiveActionCreate() error {
 	}
 
 	// Get actions directory
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	actionsDir := filepath.Join(home, ".opun", "actions")
+	actionsDir := filepath.Join(utils.OpunDir(), "actions")
 	if err := os.MkdirAll(actionsDir, 0755); err != nil {
 		return fmt.Errorf("failed to create actions directory: %w", err)
 	}
@@ -658,13 +639,8 @@ func handleRemoteAdd(itemType itemType) error {
 // installFromURL uses the remote installer to fetch and install items
 func installFromURL(url string, itemType itemType) error {
 	// Get home directory
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
 	// Initialize remote installer
-	baseDir := filepath.Join(home, ".opun", "plugins")
+	baseDir := filepath.Join(utils.OpunDir(), "plugins")
 	installer, err := plugin.NewRemoteInstaller(baseDir)
 	if err != nil {
 		return fmt.Errorf("failed to create installer: %w", err)
@@ -683,13 +659,8 @@ func installFromURL(url string, itemType itemType) error {
 // addTool adds a tool to the MCP server configuration
 func addTool(path, name string) error {
 	// Get home directory
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
 	// Tools directory
-	toolsDir := filepath.Join(home, ".opun", "tools")
+	toolsDir := filepath.Join(utils.OpunDir(), "tools")
 	if err := os.MkdirAll(toolsDir, 0755); err != nil {
 		return fmt.Errorf("failed to create tools directory: %w", err)
 	}

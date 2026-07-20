@@ -78,6 +78,7 @@ type AgentSettings struct {
 	MCPServers      []string `yaml:"mcp_servers" json:"mcp_servers"`
 	WaitForFile     string   `yaml:"wait_for_file" json:"wait_for_file"`
 	Interactive     bool     `yaml:"interactive" json:"interactive"`
+	PermissionMode  string   `yaml:"permission_mode" json:"permission_mode"`
 	ContinueOnError bool     `yaml:"continue_on_error" json:"continue_on_error"`
 }
 

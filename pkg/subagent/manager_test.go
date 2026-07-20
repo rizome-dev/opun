@@ -54,9 +54,9 @@ func NewMockSubAgent(name string) *MockSubAgent {
 	}
 }
 
-func (m *MockSubAgent) Name() string                   { return m.name }
-func (m *MockSubAgent) Config() core.SubAgentConfig    { return m.config }
-func (m *MockSubAgent) Provider() core.ProviderType    { return m.config.Provider }
+func (m *MockSubAgent) Name() string                { return m.name }
+func (m *MockSubAgent) Config() core.SubAgentConfig { return m.config }
+func (m *MockSubAgent) Provider() core.ProviderType { return m.config.Provider }
 func (m *MockSubAgent) Initialize(config core.SubAgentConfig) error {
 	m.config = config
 	return nil
@@ -67,26 +67,26 @@ func (m *MockSubAgent) Validate() error {
 	}
 	return nil
 }
-func (m *MockSubAgent) Cleanup() error                     { return nil }
-func (m *MockSubAgent) Status() core.ExecutionStatus       { 
+func (m *MockSubAgent) Cleanup() error { return nil }
+func (m *MockSubAgent) Status() core.ExecutionStatus {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.status 
+	return m.status
 }
-func (m *MockSubAgent) Cancel() error                      { 
+func (m *MockSubAgent) Cancel() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.status = core.StatusCancelled
-	return nil 
+	return nil
 }
-func (m *MockSubAgent) GetProgress() (float64, string)     { return 0.5, "processing" }
-func (m *MockSubAgent) GetCapabilities() []string          { return m.capabilities }
-func (m *MockSubAgent) SupportsParallel() bool             { return true }
-func (m *MockSubAgent) SupportsInteractive() bool          { return false }
-func (m *MockSubAgent) CanHandle(task core.SubAgentTask) bool { 
+func (m *MockSubAgent) GetProgress() (float64, string) { return 0.5, "processing" }
+func (m *MockSubAgent) GetCapabilities() []string      { return m.capabilities }
+func (m *MockSubAgent) SupportsParallel() bool         { return true }
+func (m *MockSubAgent) SupportsInteractive() bool      { return false }
+func (m *MockSubAgent) CanHandle(task core.SubAgentTask) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.canHandle 
+	return m.canHandle
 }
 
 func (m *MockSubAgent) Execute(ctx context.Context, task core.SubAgentTask) (*core.SubAgentResult, error) {
@@ -94,11 +94,11 @@ func (m *MockSubAgent) Execute(ctx context.Context, task core.SubAgentTask) (*co
 	m.status = core.StatusRunning
 	execFunc := m.executeFunc
 	m.mu.Unlock()
-	
+
 	if execFunc != nil {
 		return execFunc(ctx, task)
 	}
-	
+
 	select {
 	case <-ctx.Done():
 		m.mu.Lock()
@@ -143,9 +143,9 @@ type MockSubAgentProvider struct {
 	createFunc func(config core.SubAgentConfig) (core.SubAgent, error)
 }
 
-func (m *MockSubAgentProvider) Name() string              { return m.name }
-func (m *MockSubAgentProvider) Type() core.ProviderType   { return m.typ }
-func (m *MockSubAgentProvider) SupportsSubAgents() bool   { return true }
+func (m *MockSubAgentProvider) Name() string            { return m.name }
+func (m *MockSubAgentProvider) Type() core.ProviderType { return m.typ }
+func (m *MockSubAgentProvider) SupportsSubAgents() bool { return true }
 func (m *MockSubAgentProvider) GetSubAgentType() core.SubAgentType {
 	return core.SubAgentTypeWorkflow
 }
@@ -165,8 +165,8 @@ func (m *MockSubAgentProvider) Delegate(ctx context.Context, task core.SubAgentT
 	agent := NewMockSubAgent("delegate-agent")
 	return agent.Execute(ctx, task)
 }
-func (m *MockSubAgentProvider) RegisterSubAgent(agent core.SubAgent) error   { return nil }
-func (m *MockSubAgentProvider) UnregisterSubAgent(name string) error         { return nil }
+func (m *MockSubAgentProvider) RegisterSubAgent(agent core.SubAgent) error { return nil }
+func (m *MockSubAgentProvider) UnregisterSubAgent(name string) error       { return nil }
 
 func TestManager_Registration(t *testing.T) {
 	manager := NewManager()
@@ -460,7 +460,7 @@ func TestManager_Monitoring(t *testing.T) {
 		}
 
 		result, _ := manager.Execute(ctx, task, "monitor-agent")
-		
+
 		retrieved, err := manager.GetResults("result-task")
 		require.NoError(t, err)
 		assert.Equal(t, result.TaskID, retrieved.TaskID)
@@ -486,7 +486,7 @@ func TestManager_Monitoring(t *testing.T) {
 		active := manager.ListActiveTasks()
 		// Some tasks may have completed
 		assert.GreaterOrEqual(t, len(active), 0)
-		
+
 		wg.Wait()
 	})
 }
@@ -592,7 +592,7 @@ func TestManager_ThreadSafety(t *testing.T) {
 // Benchmark tests
 func BenchmarkManager_Register(b *testing.B) {
 	manager := NewManager()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		agent := NewMockSubAgent(string(rune('a' + (i % 26))))
@@ -605,7 +605,7 @@ func BenchmarkManager_Execute(b *testing.B) {
 	manager := NewManager()
 	agent := NewMockSubAgent("bench-agent")
 	manager.Register(agent)
-	
+
 	ctx := context.Background()
 	task := core.SubAgentTask{
 		ID:   "bench-task",

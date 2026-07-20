@@ -32,9 +32,7 @@ import (
 func TestNewSharedConfigManager(t *testing.T) {
 	// Set up test home directory
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tempDir)
 
 	t.Run("Creates Default Config", func(t *testing.T) {
 		manager, err := NewSharedConfigManager()
@@ -96,9 +94,7 @@ func TestNewSharedConfigManager(t *testing.T) {
 
 func TestSharedConfigManager_Save(t *testing.T) {
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tempDir)
 
 	manager, err := NewSharedConfigManager()
 	require.NoError(t, err)
@@ -127,9 +123,7 @@ func TestSharedConfigManager_Save(t *testing.T) {
 
 func TestSharedConfigManager_UpdateMCPServerStatus(t *testing.T) {
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tempDir)
 
 	manager, err := NewSharedConfigManager()
 	require.NoError(t, err)
@@ -164,9 +158,7 @@ func TestSharedConfigManager_UpdateMCPServerStatus(t *testing.T) {
 
 func TestSharedConfigManager_AddSlashCommand(t *testing.T) {
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tempDir)
 
 	manager, err := NewSharedConfigManager()
 	require.NoError(t, err)
@@ -213,9 +205,7 @@ func TestSharedConfigManager_AddSlashCommand(t *testing.T) {
 
 func TestSharedConfigManager_SyncToProvider(t *testing.T) {
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tempDir)
 
 	manager, err := NewSharedConfigManager()
 	require.NoError(t, err)
@@ -250,24 +240,15 @@ func TestSharedConfigManager_SyncToProvider(t *testing.T) {
 }
 
 func getClaudeConfigPaths(homeDir string) []string {
-	paths := []string{
-		filepath.Join(homeDir, "Library", "Application Support", "Claude", "claude_desktop_config.json"), // macOS
-		filepath.Join(homeDir, ".config", "claude", "claude_desktop_config.json"),                        // Linux default
-		filepath.Join(homeDir, "AppData", "Roaming", "Claude", "claude_desktop_config.json"),             // Windows
+	return []string{
+		filepath.Join(homeDir, ".claude.json"),
 	}
-	if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
-		paths = append(paths, filepath.Join(xdgConfig, "claude", "claude_desktop_config.json"))
-	}
-	return paths
 }
 
 func TestSharedConfigManager_CheckMCPServerInstalled(t *testing.T) {
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tempDir)
 
-	// Create a config with a properly configured opun server
 	configPath := filepath.Join(tempDir, ".opun", "shared-config.yaml")
 	os.MkdirAll(filepath.Dir(configPath), 0755)
 
@@ -275,14 +256,17 @@ func TestSharedConfigManager_CheckMCPServerInstalled(t *testing.T) {
 		Version: "1.0",
 		MCPServers: []core.SharedMCPServer{
 			{
-				Name:        "opun",
-				Package:     "opun",
-				Command:     "opun",
-				Args:        []string{"mcp", "stdio"},
-				Required:    true,
-				Installed:   true,
-				InstallPath: "builtin",
-				Version:     "1.0.0",
+				Name:     "shell-server",
+				Package:  "shell",
+				Command:  "sh",
+				Args:     []string{"-c", "true"},
+				Version:  "1.0.0",
+				Required: true,
+			},
+			{
+				Name:    "missing-server",
+				Package: "missing",
+				Command: "opun-test-nonexistent-cli",
 			},
 		},
 	}
@@ -295,14 +279,16 @@ func TestSharedConfigManager_CheckMCPServerInstalled(t *testing.T) {
 	manager, err := NewSharedConfigManager()
 	require.NoError(t, err)
 
-	// Check opun server - it's marked as installed with "builtin" path
-	// The current implementation requires the file to exist, so it returns false
-	installed, version, err := manager.CheckMCPServerInstalled("opun")
+	installed, version, err := manager.CheckMCPServerInstalled("shell-server")
+	require.NoError(t, err)
+	assert.True(t, installed)
+	assert.Equal(t, "1.0.0", version)
+
+	installed, version, err = manager.CheckMCPServerInstalled("missing-server")
 	require.NoError(t, err)
 	assert.False(t, installed)
 	assert.Empty(t, version)
 
-	// Check non-existent server
 	installed, version, err = manager.CheckMCPServerInstalled("non-existent")
 	require.NoError(t, err)
 	assert.False(t, installed)
@@ -311,9 +297,7 @@ func TestSharedConfigManager_CheckMCPServerInstalled(t *testing.T) {
 
 func TestSharedConfigManager_EnsureOpunServer(t *testing.T) {
 	tempDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tempDir)
 
 	// Create a config without opun server
 	configPath := filepath.Join(tempDir, ".opun", "shared-config.yaml")

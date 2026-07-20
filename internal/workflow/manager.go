@@ -19,6 +19,7 @@ package workflow
 import (
 	"context"
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,11 +36,7 @@ type Manager struct {
 // NewManager creates a new workflow manager
 func NewManager(workflowDir string) (*Manager, error) {
 	if workflowDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, err
-		}
-		workflowDir = filepath.Join(home, ".opun", "workflows")
+		workflowDir = filepath.Join(utils.OpunDir(), "workflows")
 	}
 
 	// Ensure directory exists

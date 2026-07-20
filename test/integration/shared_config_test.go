@@ -1,3 +1,5 @@
+//go:build integration
+
 package integration_test
 
 // Copyright (C) 2025 Rizome Labs, Inc.
@@ -42,9 +44,7 @@ func TestSharedConfigManager(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Override home directory for testing
-	originalHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", originalHome)
+	t.Setenv("HOME", tmpDir)
 
 	t.Run("CreateAndLoadSharedConfig", func(t *testing.T) {
 		manager, err := config.NewSharedConfigManager()
@@ -131,9 +131,7 @@ func TestSharedMCPInstaller(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Override home directory for testing
-	originalHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", originalHome)
+	t.Setenv("HOME", tmpDir)
 
 	t.Run("CreateInstaller", func(t *testing.T) {
 		installer, err := mcp.NewSharedMCPInstaller()
@@ -142,15 +140,15 @@ func TestSharedMCPInstaller(t *testing.T) {
 	})
 
 	t.Run("CheckExistingInstallations", func(t *testing.T) {
+		if os.Getenv("OPUN_TEST_ALLOW_NETWORK") != "1" {
+			t.Skip("Set OPUN_TEST_ALLOW_NETWORK=1 to run tests that install npm packages")
+		}
+
 		installer, err := mcp.NewSharedMCPInstaller()
 		require.NoError(t, err)
 
-		// This test just verifies the method works without error
 		ctx := context.Background()
-
-		// We're not actually installing in tests, just checking the logic works
 		err = installer.InstallServers(ctx, []string{"memory"})
-		// May fail if npm is not available, which is fine for unit tests
 		_ = err
 	})
 
@@ -176,9 +174,7 @@ func TestProviderSync(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Override home directory for testing
-	originalHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", originalHome)
+	t.Setenv("HOME", tmpDir)
 
 	t.Run("SyncToClaude", func(t *testing.T) {
 		manager, err := config.NewSharedConfigManager()
@@ -200,7 +196,7 @@ func TestProviderSync(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Verify the config file was created
-		claudeConfigPath := filepath.Join(tmpDir, "Library", "Application Support", "Claude", "claude_desktop_config.json")
+		claudeConfigPath := filepath.Join(tmpDir, ".claude.json")
 		// The path might not exist in test environment, which is fine
 		if _, err := os.Stat(filepath.Dir(claudeConfigPath)); err == nil {
 			// If the directory exists, check if file was created
@@ -255,9 +251,7 @@ func TestFullIntegrationFlow(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Override home directory for testing
-	originalHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", originalHome)
+	t.Setenv("HOME", tmpDir)
 
 	// 1. Create shared config manager
 	manager, err := config.NewSharedConfigManager()
@@ -277,12 +271,12 @@ func TestFullIntegrationFlow(t *testing.T) {
 	installer, err := mcp.NewSharedMCPInstaller()
 	require.NoError(t, err)
 
-	// 4. Check for installations (won't actually install in test)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// This may fail if npm is not available, which is expected in tests
-	_ = installer.InstallServers(ctx, []string{"memory"})
+	if os.Getenv("OPUN_TEST_ALLOW_NETWORK") == "1" {
+		_ = installer.InstallServers(ctx, []string{"memory"})
+	}
 
 	// 5. Sync to providers
 	err = installer.SyncConfigurations([]string{"claude", "gemini"})

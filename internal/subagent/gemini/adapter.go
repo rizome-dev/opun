@@ -19,9 +19,11 @@ package gemini
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/rizome-dev/opun/internal/headless"
 	"github.com/rizome-dev/opun/pkg/core"
 )
 
@@ -31,15 +33,16 @@ type GeminiAdapter struct {
 	provider core.Provider
 	status   core.ExecutionStatus
 	scope    *SubAgentScope
+	Runner   headless.Runner
 }
 
 // SubAgentScope represents Gemini's subagent configuration
 type SubAgentScope struct {
-	Name         string        `json:"name"`
-	Description  string        `json:"description"`
-	PromptConfig PromptConfig  `json:"prompt_config"`
-	ModelConfig  ModelConfig   `json:"model_config"`
-	RunConfig    RunConfig     `json:"run_config"`
+	Name         string       `json:"name"`
+	Description  string       `json:"description"`
+	PromptConfig PromptConfig `json:"prompt_config"`
+	ModelConfig  ModelConfig  `json:"model_config"`
+	RunConfig    RunConfig    `json:"run_config"`
 }
 
 // PromptConfig defines the prompt configuration
@@ -61,11 +64,11 @@ type ModelConfig struct {
 
 // RunConfig defines execution configuration
 type RunConfig struct {
-	Interactive         bool     `json:"interactive"`
-	TerminateOnComplete bool     `json:"terminate_on_complete"`
-	OutputCollector     string   `json:"output_collector"`
-	MaxIterations       int      `json:"max_iterations"`
-	Timeout             int      `json:"timeout"`
+	Interactive         bool   `json:"interactive"`
+	TerminateOnComplete bool   `json:"terminate_on_complete"`
+	OutputCollector     string `json:"output_collector"`
+	MaxIterations       int    `json:"max_iterations"`
+	Timeout             int    `json:"timeout"`
 }
 
 // NewGeminiAdapter creates a new Gemini subagent adapter
@@ -73,6 +76,7 @@ func NewGeminiAdapter(config core.SubAgentConfig) *GeminiAdapter {
 	return &GeminiAdapter{
 		config: config,
 		status: core.StatusPending,
+		Runner: &headless.GeminiRunner{},
 	}
 }
 
@@ -94,7 +98,7 @@ func (a *GeminiAdapter) Provider() core.ProviderType {
 // Initialize initializes the adapter
 func (a *GeminiAdapter) Initialize(config core.SubAgentConfig) error {
 	a.config = config
-	
+
 	// Create SubAgentScope configuration
 	a.scope = &SubAgentScope{
 		Name:        config.Name,
@@ -119,7 +123,7 @@ func (a *GeminiAdapter) Initialize(config core.SubAgentConfig) error {
 			Timeout:             int(config.Timeout.Seconds()),
 		},
 	}
-	
+
 	// Apply provider-specific configuration
 	if config.ProviderConfig != nil {
 		if temp, ok := config.ProviderConfig["temperature"].(float64); ok {
@@ -132,7 +136,7 @@ func (a *GeminiAdapter) Initialize(config core.SubAgentConfig) error {
 			a.scope.RunConfig.MaxIterations = maxIter
 		}
 	}
-	
+
 	return nil
 }
 
@@ -141,11 +145,11 @@ func (a *GeminiAdapter) Validate() error {
 	if a.config.Name == "" {
 		return fmt.Errorf("agent name is required")
 	}
-	
+
 	if a.config.Model == "" {
-		a.config.Model = "gemini-1.5-flash" // Default model
+		a.config.Model = "auto"
 	}
-	
+
 	return nil
 }
 
@@ -159,59 +163,70 @@ func (a *GeminiAdapter) Cleanup() error {
 func (a *GeminiAdapter) Execute(ctx context.Context, task core.SubAgentTask) (*core.SubAgentResult, error) {
 	startTime := time.Now()
 	a.status = core.StatusRunning
-	
-	// Build the execution command for Gemini
-	execCommand := a.buildExecutionCommand(task)
-	
-	// Execute via provider (this would use PTY in real implementation)
-	if a.provider != nil {
-		if err := a.provider.InjectPrompt(execCommand); err != nil {
-			a.status = core.StatusFailed
-			return &core.SubAgentResult{
-				TaskID:    task.ID,
-				AgentName: a.config.Name,
-				Status:    core.StatusFailed,
-				Error:     err,
-				StartTime: startTime,
-				EndTime:   time.Now(),
-				Duration:  time.Since(startTime),
-			}, err
-		}
+
+	result, err := a.Runner.Run(ctx, headless.Request{
+		Prompt:       a.buildTaskPrompt(task),
+		SystemPrompt: a.config.SystemPrompt,
+		Model:        a.config.Model,
+	})
+	if err != nil {
+		a.status = core.StatusFailed
+		return &core.SubAgentResult{
+			TaskID:    task.ID,
+			AgentName: a.config.Name,
+			Status:    core.StatusFailed,
+			Error:     err,
+			StartTime: startTime,
+			EndTime:   time.Now(),
+			Duration:  time.Since(startTime),
+		}, err
 	}
-	
-	// In a real implementation, we would:
-	// 1. Monitor PTY output for emitvalue calls
-	// 2. Collect output until termination
-	// 3. Parse the collected values
-	
+
 	a.status = core.StatusCompleted
-	
+
 	return &core.SubAgentResult{
 		TaskID:    task.ID,
 		AgentName: a.config.Name,
 		Status:    core.StatusCompleted,
-		Output:    fmt.Sprintf("Task %s completed by Gemini agent %s", task.Name, a.config.Name),
+		Output:    result.Output,
 		StartTime: startTime,
 		EndTime:   time.Now(),
 		Duration:  time.Since(startTime),
 		Metadata: map[string]interface{}{
-			"provider":         "gemini",
-			"method":           "subagent_scope",
-			"output_collector": "emitvalue",
+			"provider": "gemini",
+			"method":   "headless",
 		},
 	}, nil
+}
+
+func (a *GeminiAdapter) buildTaskPrompt(task core.SubAgentTask) string {
+	prompt := fmt.Sprintf("Task: %s\n", task.Name)
+	prompt += fmt.Sprintf("Description: %s\n", task.Description)
+
+	if task.Input != "" {
+		prompt += fmt.Sprintf("\nInput:\n%s\n", task.Input)
+	}
+
+	if len(task.Constraints) > 0 {
+		prompt += "\nConstraints:\n"
+		for _, constraint := range task.Constraints {
+			prompt += fmt.Sprintf("- %s\n", constraint)
+		}
+	}
+
+	return prompt
 }
 
 // ExecuteAsync executes a task asynchronously
 func (a *GeminiAdapter) ExecuteAsync(ctx context.Context, task core.SubAgentTask) (<-chan *core.SubAgentResult, error) {
 	resultChan := make(chan *core.SubAgentResult, 1)
-	
+
 	go func() {
 		result, _ := a.Execute(ctx, task)
 		resultChan <- result
 		close(resultChan)
 	}()
-	
+
 	return resultChan, nil
 }
 
@@ -245,25 +260,7 @@ func (a *GeminiAdapter) GetProgress() (float64, string) {
 
 // CanHandle checks if the agent can handle a task
 func (a *GeminiAdapter) CanHandle(task core.SubAgentTask) bool {
-	// Check capabilities match
-	for _, taskCap := range extractCapabilities(task) {
-		for _, agentCap := range a.config.Capabilities {
-			if taskCap == agentCap {
-				return true
-			}
-		}
-	}
-	
-	// Check if task type matches
-	if taskType, ok := task.Context["type"].(string); ok {
-		for _, cap := range a.config.Capabilities {
-			if cap == taskType {
-				return true
-			}
-		}
-	}
-	
-	return len(a.config.Capabilities) == 0 // Accept all if no specific capabilities
+	return core.MatchesCapabilities(a.config.Capabilities, task)
 }
 
 // GetCapabilities returns agent capabilities
@@ -298,13 +295,13 @@ func (a *GeminiAdapter) AdaptTask(task core.SubAgentTask) (interface{}, error) {
 		"variables":   task.Variables,
 		"context":     task.Context,
 	}
-	
+
 	// Add to prompt variables
 	if a.scope != nil {
 		a.scope.PromptConfig.Variables["task"] = task.Description
 		a.scope.PromptConfig.Variables["input"] = task.Input
 	}
-	
+
 	return geminiTask, nil
 }
 
@@ -312,7 +309,7 @@ func (a *GeminiAdapter) AdaptTask(task core.SubAgentTask) (interface{}, error) {
 func (a *GeminiAdapter) AdaptResult(result interface{}) (*core.SubAgentResult, error) {
 	// Parse Gemini emitvalue output
 	var output string
-	
+
 	switch v := result.(type) {
 	case string:
 		output = v
@@ -328,14 +325,29 @@ func (a *GeminiAdapter) AdaptResult(result interface{}) (*core.SubAgentResult, e
 	default:
 		output = fmt.Sprintf("%v", result)
 	}
-	
-	return &core.SubAgentResult{
+
+	res := &core.SubAgentResult{
 		Status: core.StatusCompleted,
 		Output: output,
 		Metadata: map[string]interface{}{
 			"raw_result": result,
 		},
-	}, nil
+	}
+
+	if m, ok := result.(map[string]interface{}); ok {
+		if status, _ := m["status"].(string); status == "error" || status == "failed" {
+			res.Status = core.StatusFailed
+			if msg, _ := m["error_message"].(string); msg != "" {
+				res.Error = errors.New(msg)
+			} else if msg, _ := m["error"].(string); msg != "" {
+				res.Error = errors.New(msg)
+			} else {
+				res.Error = errors.New("task failed")
+			}
+		}
+	}
+
+	return res, nil
 }
 
 // GetProviderConfig returns provider-specific configuration
@@ -347,7 +359,7 @@ func (a *GeminiAdapter) GetProviderConfig() map[string]interface{} {
 func (a *GeminiAdapter) buildSystemPrompt() string {
 	prompt := fmt.Sprintf("You are %s, a specialized AI agent.\n\n", a.config.Name)
 	prompt += fmt.Sprintf("Description: %s\n\n", a.config.Description)
-	
+
 	if len(a.config.Capabilities) > 0 {
 		prompt += "Your capabilities include:\n"
 		for _, cap := range a.config.Capabilities {
@@ -355,89 +367,25 @@ func (a *GeminiAdapter) buildSystemPrompt() string {
 		}
 		prompt += "\n"
 	}
-	
+
 	prompt += "Instructions:\n"
 	prompt += "1. Process the given task carefully\n"
 	prompt += "2. Use self.emitvalue() to output results\n"
 	prompt += "3. Emit structured data when possible\n"
 	prompt += "4. Complete the task and terminate\n"
-	
+
 	return prompt
-}
-
-// buildExecutionCommand builds the command to execute a subagent
-func (a *GeminiAdapter) buildExecutionCommand(task core.SubAgentTask) string {
-	// Build Python code to create and run SubAgentScope
-	code := fmt.Sprintf(`
-# Create subagent for task: %s
-from gemini_cli import SubAgentScope
-
-scope = SubAgentScope(
-    name="%s",
-    description="%s",
-    prompt_config={
-        "system_prompt": """%s""",
-        "variables": %s,
-        "temperature": %f,
-        "max_tokens": %d
-    },
-    model_config={
-        "model": "%s",
-        "response_format": "%s"
-    },
-    run_config={
-        "interactive": %t,
-        "terminate_on_complete": true,
-        "output_collector": "emitvalue",
-        "max_iterations": %d
-    }
-)
-
-# Execute task
-scope.run("""%s""")
-`,
-		task.Name,
-		a.scope.Name,
-		a.scope.Description,
-		a.scope.PromptConfig.SystemPrompt,
-		formatVariables(task.Variables),
-		a.scope.PromptConfig.Temperature,
-		a.scope.PromptConfig.MaxTokens,
-		a.scope.ModelConfig.Model,
-		a.scope.ModelConfig.ResponseFormat,
-		a.scope.RunConfig.Interactive,
-		a.scope.RunConfig.MaxIterations,
-		task.Input,
-	)
-	
-	return code
-}
-
-// Helper functions
-
-func extractCapabilities(task core.SubAgentTask) []string {
-	var caps []string
-	
-	if taskCaps, ok := task.Context["capabilities"].([]string); ok {
-		caps = append(caps, taskCaps...)
-	}
-	
-	if taskType, ok := task.Context["type"].(string); ok {
-		caps = append(caps, taskType)
-	}
-	
-	return caps
 }
 
 func formatVariables(vars map[string]interface{}) string {
 	if len(vars) == 0 {
 		return "{}"
 	}
-	
+
 	jsonBytes, err := json.Marshal(vars)
 	if err != nil {
 		return "{}"
 	}
-	
+
 	return string(jsonBytes)
 }

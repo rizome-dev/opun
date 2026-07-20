@@ -18,11 +18,13 @@ package claude
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/rizome-dev/opun/internal/headless"
 	"github.com/rizome-dev/opun/pkg/core"
 	"gopkg.in/yaml.v3"
 )
@@ -33,6 +35,7 @@ type ClaudeAdapter struct {
 	provider core.Provider
 	status   core.ExecutionStatus
 	agentDir string
+	Runner   headless.Runner
 }
 
 // ClaudeAgentDefinition represents the structure of a Claude agent definition file
@@ -51,6 +54,7 @@ func NewClaudeAdapter(config core.SubAgentConfig) *ClaudeAdapter {
 	return &ClaudeAdapter{
 		config: config,
 		status: core.StatusPending,
+		Runner: &headless.ClaudeRunner{},
 	}
 }
 
@@ -72,21 +76,21 @@ func (a *ClaudeAdapter) Provider() core.ProviderType {
 // Initialize initializes the adapter
 func (a *ClaudeAdapter) Initialize(config core.SubAgentConfig) error {
 	a.config = config
-	
+
 	// Set up Claude agent directory
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("failed to get home directory: %w", err)
 	}
-	
+
 	// Claude uses .claude/agents/ for agent definitions
 	a.agentDir = filepath.Join(homeDir, ".claude", "agents")
-	
+
 	// Ensure directory exists
 	if err := os.MkdirAll(a.agentDir, 0755); err != nil {
 		return fmt.Errorf("failed to create agent directory: %w", err)
 	}
-	
+
 	// Create agent definition file
 	return a.createAgentDefinition()
 }
@@ -96,11 +100,11 @@ func (a *ClaudeAdapter) Validate() error {
 	if a.config.Name == "" {
 		return fmt.Errorf("agent name is required")
 	}
-	
+
 	if a.config.Description == "" {
 		return fmt.Errorf("agent description is required")
 	}
-	
+
 	return nil
 }
 
@@ -113,55 +117,47 @@ func (a *ClaudeAdapter) Cleanup() error {
 			return fmt.Errorf("failed to remove agent file: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 
-// Execute executes a task using Claude's Task tool
+// Execute executes a task via Claude's headless print mode
 func (a *ClaudeAdapter) Execute(ctx context.Context, task core.SubAgentTask) (*core.SubAgentResult, error) {
 	startTime := time.Now()
 	a.status = core.StatusRunning
-	
-	// For Claude, we use the Task tool which is part of its declarative system
-	// The actual execution would involve:
-	// 1. Creating a task definition that references this agent
-	// 2. Injecting the task via PTY
-	// 3. Monitoring output
-	
-	// Build the Task tool invocation
-	taskPrompt := a.buildTaskPrompt(task)
-	
-	// Execute via provider (this would use PTY in real implementation)
-	if a.provider != nil {
-		if err := a.provider.InjectPrompt(taskPrompt); err != nil {
-			a.status = core.StatusFailed
-			return &core.SubAgentResult{
-				TaskID:    task.ID,
-				AgentName: a.config.Name,
-				Status:    core.StatusFailed,
-				Error:     err,
-				StartTime: startTime,
-				EndTime:   time.Now(),
-				Duration:  time.Since(startTime),
-			}, err
-		}
+
+	result, err := a.Runner.Run(ctx, headless.Request{
+		Prompt:       a.buildTaskPrompt(task),
+		SystemPrompt: a.config.SystemPrompt,
+		Model:        a.config.Model,
+	})
+	if err != nil {
+		a.status = core.StatusFailed
+		return &core.SubAgentResult{
+			TaskID:    task.ID,
+			AgentName: a.config.Name,
+			Status:    core.StatusFailed,
+			Error:     err,
+			StartTime: startTime,
+			EndTime:   time.Now(),
+			Duration:  time.Since(startTime),
+		}, err
 	}
-	
-	// In a real implementation, we would monitor the PTY output
-	// For now, we'll simulate success
+
 	a.status = core.StatusCompleted
-	
+
 	return &core.SubAgentResult{
 		TaskID:    task.ID,
 		AgentName: a.config.Name,
 		Status:    core.StatusCompleted,
-		Output:    fmt.Sprintf("Task %s completed by Claude agent %s", task.Name, a.config.Name),
+		Output:    result.Output,
 		StartTime: startTime,
 		EndTime:   time.Now(),
 		Duration:  time.Since(startTime),
 		Metadata: map[string]interface{}{
-			"provider": "claude",
-			"method":   "task_tool",
+			"provider":   "claude",
+			"method":     "headless",
+			"session_id": result.SessionID,
 		},
 	}, nil
 }
@@ -169,13 +165,13 @@ func (a *ClaudeAdapter) Execute(ctx context.Context, task core.SubAgentTask) (*c
 // ExecuteAsync executes a task asynchronously
 func (a *ClaudeAdapter) ExecuteAsync(ctx context.Context, task core.SubAgentTask) (<-chan *core.SubAgentResult, error) {
 	resultChan := make(chan *core.SubAgentResult, 1)
-	
+
 	go func() {
 		result, _ := a.Execute(ctx, task)
 		resultChan <- result
 		close(resultChan)
 	}()
-	
+
 	return resultChan, nil
 }
 
@@ -208,25 +204,16 @@ func (a *ClaudeAdapter) GetProgress() (float64, string) {
 
 // CanHandle checks if the agent can handle a task
 func (a *ClaudeAdapter) CanHandle(task core.SubAgentTask) bool {
-	// Check if task matches agent capabilities
-	taskCaps := extractTaskCapabilities(task)
-	agentCaps := a.config.Capabilities
-	
-	for _, taskCap := range taskCaps {
-		for _, agentCap := range agentCaps {
-			if taskCap == agentCap {
-				return true
-			}
-		}
+	if core.MatchesCapabilities(a.config.Capabilities, task) {
+		return true
 	}
-	
-	// Check context matching
+
 	for _, pattern := range a.config.Context {
 		if matchesContext(task, pattern) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -237,7 +224,7 @@ func (a *ClaudeAdapter) GetCapabilities() []string {
 
 // SupportsParallel checks if parallel execution is supported
 func (a *ClaudeAdapter) SupportsParallel() bool {
-	return a.config.Parallel
+	return true
 }
 
 // SupportsInteractive checks if interactive mode is supported
@@ -260,19 +247,69 @@ func (a *ClaudeAdapter) AdaptTask(task core.SubAgentTask) (interface{}, error) {
 		"context":     task.Context,
 		"constraints": task.Constraints,
 	}
-	
+
 	return claudeTask, nil
 }
 
 // AdaptResult adapts Claude output to standard result format
 func (a *ClaudeAdapter) AdaptResult(result interface{}) (*core.SubAgentResult, error) {
-	// Parse Claude output format
-	// This would parse the actual output from Claude's Task tool
-	
-	return &core.SubAgentResult{
-		Status: core.StatusCompleted,
-		Output: fmt.Sprintf("%v", result),
-	}, nil
+	m, ok := result.(map[string]interface{})
+	if !ok {
+		return &core.SubAgentResult{
+			Status: core.StatusCompleted,
+			Output: fmt.Sprintf("%v", result),
+		}, nil
+	}
+
+	res := &core.SubAgentResult{Status: core.StatusCompleted}
+
+	if status, _ := m["status"].(string); status == "failed" || status == "error" {
+		res.Status = core.StatusFailed
+		if msg, _ := m["error"].(string); msg != "" {
+			res.Error = errors.New(msg)
+		} else {
+			res.Error = errors.New("task failed")
+		}
+	}
+
+	if output, _ := m["output"].(string); output != "" {
+		res.Output = output
+	}
+
+	if meta, _ := m["metadata"].(map[string]interface{}); meta != nil {
+		res.Metadata = meta
+	}
+
+	for _, raw := range mapSlice(m["artifacts"]) {
+		name, _ := raw["name"].(string)
+		typ, _ := raw["type"].(string)
+		content, _ := raw["content"].(string)
+		res.Artifacts = append(res.Artifacts, core.SubAgentArtifact{
+			Name:    name,
+			Type:    typ,
+			Content: []byte(content),
+			Size:    int64(len(content)),
+		})
+	}
+
+	return res, nil
+}
+
+func mapSlice(v interface{}) []map[string]interface{} {
+	switch s := v.(type) {
+	case []map[string]interface{}:
+		return s
+	case []interface{}:
+		out := make([]map[string]interface{}, 0, len(s))
+		for _, item := range s {
+			if m, ok := item.(map[string]interface{}); ok {
+				out = append(out, m)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
 }
 
 // GetProviderConfig returns provider-specific configuration
@@ -292,13 +329,13 @@ func (a *ClaudeAdapter) createAgentDefinition() error {
 		Tools:        a.config.Tools,
 		MCPServers:   a.config.MCPServers,
 	}
-	
+
 	// Write YAML front matter
 	yamlData, err := yaml.Marshal(def)
 	if err != nil {
 		return fmt.Errorf("failed to marshal agent definition: %w", err)
 	}
-	
+
 	// Create agent file with Markdown content
 	agentFile := filepath.Join(a.agentDir, a.config.Name+".md")
 	content := fmt.Sprintf("---\n%s---\n\n# %s\n\n%s\n\n## Instructions\n\n%s\n",
@@ -307,73 +344,57 @@ func (a *ClaudeAdapter) createAgentDefinition() error {
 		def.Description,
 		def.Instructions,
 	)
-	
+
 	if err := os.WriteFile(agentFile, []byte(content), 0644); err != nil {
 		return fmt.Errorf("failed to write agent file: %w", err)
 	}
-	
+
 	return nil
 }
 
 // buildInstructions builds agent instructions from config
 func (a *ClaudeAdapter) buildInstructions() string {
 	instructions := fmt.Sprintf("You are %s, a specialized agent with the following capabilities:\n\n", a.config.Name)
-	
+
 	for _, cap := range a.config.Capabilities {
 		instructions += fmt.Sprintf("- %s\n", cap)
 	}
-	
+
 	instructions += "\n## Context Patterns\n\n"
 	for _, ctx := range a.config.Context {
 		instructions += fmt.Sprintf("- %s\n", ctx)
 	}
-	
+
 	if len(a.config.Tools) > 0 {
 		instructions += "\n## Available Tools\n\n"
 		for _, tool := range a.config.Tools {
 			instructions += fmt.Sprintf("- %s\n", tool)
 		}
 	}
-	
+
 	return instructions
 }
 
 // buildTaskPrompt builds the prompt for Task tool invocation
 func (a *ClaudeAdapter) buildTaskPrompt(task core.SubAgentTask) string {
-	prompt := fmt.Sprintf("Using the Task tool, delegate the following to agent '%s':\n\n", a.config.Name)
-	prompt += fmt.Sprintf("Task: %s\n", task.Name)
+	prompt := fmt.Sprintf("Task: %s\n", task.Name)
 	prompt += fmt.Sprintf("Description: %s\n", task.Description)
-	
+
 	if task.Input != "" {
 		prompt += fmt.Sprintf("\nInput:\n%s\n", task.Input)
 	}
-	
+
 	if len(task.Constraints) > 0 {
 		prompt += "\nConstraints:\n"
 		for _, constraint := range task.Constraints {
 			prompt += fmt.Sprintf("- %s\n", constraint)
 		}
 	}
-	
+
 	return prompt
 }
 
 // Helper functions
-
-func extractTaskCapabilities(task core.SubAgentTask) []string {
-	// Extract capabilities from task description and context
-	var caps []string
-	
-	// This would use NLP or pattern matching in a real implementation
-	// For now, we'll use simple keyword extraction
-	if task.Context != nil {
-		if taskCaps, ok := task.Context["capabilities"].([]string); ok {
-			caps = append(caps, taskCaps...)
-		}
-	}
-	
-	return caps
-}
 
 func matchesContext(task core.SubAgentTask, pattern string) bool {
 	// Simple pattern matching - could be enhanced with regex or NLP
@@ -381,7 +402,7 @@ func matchesContext(task core.SubAgentTask, pattern string) bool {
 	if contains(task.Description, pattern) || contains(task.Name, pattern) {
 		return true
 	}
-	
+
 	// Check context values
 	for _, value := range task.Context {
 		if str, ok := value.(string); ok {
@@ -390,15 +411,15 @@ func matchesContext(task core.SubAgentTask, pattern string) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
 func contains(text, pattern string) bool {
 	// Case-insensitive contains
-	return len(text) >= len(pattern) && 
-		(text == pattern || 
-		 len(text) > len(pattern) && 
-		 (text[:len(pattern)] == pattern || 
-		  text[len(text)-len(pattern):] == pattern))
+	return len(text) >= len(pattern) &&
+		(text == pattern ||
+			len(text) > len(pattern) &&
+				(text[:len(pattern)] == pattern ||
+					text[len(text)-len(pattern):] == pattern))
 }

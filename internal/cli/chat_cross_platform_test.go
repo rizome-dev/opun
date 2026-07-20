@@ -13,19 +13,10 @@ import (
 
 // TestChatCrossPlatform verifies that chat functionality works on all platforms
 func TestChatCrossPlatform(t *testing.T) {
-	// Save original environment
-	oldHome := os.Getenv("HOME")
-	oldUserProfile := os.Getenv("USERPROFILE")
-	defer func() {
-		os.Setenv("HOME", oldHome)
-		os.Setenv("USERPROFILE", oldUserProfile)
-	}()
-
-	// Create a temporary home directory for testing
 	tempHome := t.TempDir()
-	os.Setenv("HOME", tempHome)
+	t.Setenv("HOME", tempHome)
 	if runtime.GOOS == "windows" {
-		os.Setenv("USERPROFILE", tempHome)
+		t.Setenv("USERPROFILE", tempHome)
 	}
 
 	// Create required directories

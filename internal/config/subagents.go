@@ -19,6 +19,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,12 +35,7 @@ type SubAgentConfigLoader struct {
 
 // NewSubAgentConfigLoader creates a new config loader
 func NewSubAgentConfigLoader() (*SubAgentConfigLoader, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-
-	configDir := filepath.Join(home, ".opun", "subagents")
+	configDir := filepath.Join(utils.OpunDir(), "subagents")
 	return &SubAgentConfigLoader{
 		configDir: configDir,
 	}, nil
@@ -65,9 +61,9 @@ func (l *SubAgentConfigLoader) LoadAll() ([]core.SubAgentConfig, error) {
 
 		// Only process config files
 		name := entry.Name()
-		if !strings.HasSuffix(name, ".yaml") && 
-		   !strings.HasSuffix(name, ".yml") && 
-		   !strings.HasSuffix(name, ".json") {
+		if !strings.HasSuffix(name, ".yaml") &&
+			!strings.HasSuffix(name, ".yml") &&
+			!strings.HasSuffix(name, ".json") {
 			continue
 		}
 
@@ -91,7 +87,7 @@ func (l *SubAgentConfigLoader) LoadFile(path string) (core.SubAgentConfig, error
 	}
 
 	var config core.SubAgentConfig
-	
+
 	// Try YAML first, then JSON
 	if strings.HasSuffix(path, ".json") {
 		err = json.Unmarshal(data, &config)

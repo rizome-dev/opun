@@ -18,7 +18,9 @@ package cli
 
 import (
 	"fmt"
+	"github.com/rizome-dev/opun/internal/utils"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/charmbracelet/lipgloss"
@@ -107,14 +109,11 @@ func (h *HealthCheck) checkMCPServer() ServiceStatus {
 		Count: -1,
 	}
 
-	// Check if unified MCP server is configured
-	mcpServerPath := filepath.Join(h.homeDir, ".opun", "mcp", "opun-server.js")
-	if _, err := os.Stat(mcpServerPath); err == nil {
+	if _, err := exec.LookPath("opun"); err == nil {
 		status.Status = true
 		return status
 	}
 
-	// Check if any MCP servers are installed
 	if h.sharedManager != nil {
 		servers := h.sharedManager.GetMCPServers()
 		installed := 0
@@ -135,7 +134,7 @@ func (h *HealthCheck) checkPromptGardenClaude() ServiceStatus {
 		Name: "PromptGarden",
 	}
 
-	gardenPath := filepath.Join(h.homeDir, ".opun", "promptgarden")
+	gardenPath := filepath.Join(utils.OpunDir(), "promptgarden")
 	if garden, err := promptgarden.NewGarden(gardenPath); err == nil {
 		prompts, _ := garden.ListPrompts()
 		status.Status = true
@@ -156,7 +155,7 @@ func (h *HealthCheck) checkPromptGardenGemini() ServiceStatus {
 
 	// For Gemini, PromptGarden is accessed through MCP
 	if mcpStatus := h.checkMCPServer(); mcpStatus.Status {
-		gardenPath := filepath.Join(h.homeDir, ".opun", "promptgarden")
+		gardenPath := filepath.Join(utils.OpunDir(), "promptgarden")
 		if garden, err := promptgarden.NewGarden(gardenPath); err == nil {
 			prompts, _ := garden.ListPrompts()
 			status.Status = true
@@ -221,7 +220,7 @@ func (h *HealthCheck) checkWorkflows() ServiceStatus {
 		Name: "Workflows",
 	}
 
-	workflowDir := filepath.Join(h.homeDir, ".opun", "workflows")
+	workflowDir := filepath.Join(utils.OpunDir(), "workflows")
 	if manager, err := workflow.NewManager(workflowDir); err == nil {
 		workflows, _ := manager.ListWorkflows()
 		status.Status = true
@@ -240,7 +239,7 @@ func (h *HealthCheck) checkActions() ServiceStatus {
 		Name: "Actions",
 	}
 
-	actionsDir := filepath.Join(h.homeDir, ".opun", "actions")
+	actionsDir := filepath.Join(utils.OpunDir(), "actions")
 	loader := tools.NewLoader(actionsDir)
 	if err := loader.LoadAll(); err == nil {
 		actionList := loader.GetRegistry().List("")
@@ -262,7 +261,7 @@ func (h *HealthCheck) checkTools() ServiceStatus {
 	}
 
 	// Check tools directory
-	toolsDir := filepath.Join(h.homeDir, ".opun", "tools")
+	toolsDir := filepath.Join(utils.OpunDir(), "tools")
 	if entries, err := os.ReadDir(toolsDir); err == nil {
 		count := 0
 		for _, entry := range entries {
@@ -283,7 +282,7 @@ func (h *HealthCheck) checkTools() ServiceStatus {
 
 // checkMemoryManagement checks memory management
 func (h *HealthCheck) checkMemoryManagement() ServiceStatus {
-	sessionDir := filepath.Join(h.homeDir, ".opun", "sessions")
+	sessionDir := filepath.Join(utils.OpunDir(), "sessions")
 	info, err := os.Stat(sessionDir)
 
 	return ServiceStatus{

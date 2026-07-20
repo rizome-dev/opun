@@ -19,12 +19,11 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/rizome-dev/opun/pkg/core"
 )
 
-// ClaudeConfigTranslator translates shared config to Claude Desktop format
+// ClaudeConfigTranslator translates shared config to Claude Code CLI format
 type ClaudeConfigTranslator struct{}
 
 // NewClaudeConfigTranslator creates a new Claude config translator
@@ -32,8 +31,8 @@ func NewClaudeConfigTranslator() *ClaudeConfigTranslator {
 	return &ClaudeConfigTranslator{}
 }
 
-// ClaudeDesktopConfig represents Claude Desktop's configuration format
-type ClaudeDesktopConfig struct {
+// ClaudeConfig represents the mcpServers section of Claude Code's user config
+type ClaudeConfig struct {
 	MCPServers map[string]ClaudeMCPServer `json:"mcpServers,omitempty"`
 }
 
@@ -46,7 +45,7 @@ type ClaudeMCPServer struct {
 
 // TranslateMCPConfig translates shared MCP config to Claude format
 func (c *ClaudeConfigTranslator) TranslateMCPConfig(servers []core.SharedMCPServer) (interface{}, error) {
-	claudeConfig := ClaudeDesktopConfig{
+	claudeConfig := ClaudeConfig{
 		MCPServers: make(map[string]ClaudeMCPServer),
 	}
 
@@ -95,41 +94,13 @@ func (c *ClaudeConfigTranslator) TranslateSlashCommands(commands []core.SharedSl
 	return nil, nil
 }
 
-// GetConfigPath returns Claude Desktop's config file path
+// GetConfigPath returns the Claude Code CLI's user-scope config file path
 func (c *ClaudeConfigTranslator) GetConfigPath() string {
 	homeDir, _ := os.UserHomeDir()
-
-	// Try different locations based on OS and Claude version
-	switch runtime.GOOS {
-	case "darwin":
-		// Primary location on macOS
-		primary := filepath.Join(homeDir, "Library", "Application Support", "Claude", "claude_desktop_config.json")
-		if _, err := os.Stat(filepath.Dir(primary)); err == nil {
-			return primary
-		}
-		// Fallback to XDG config
-		return filepath.Join(homeDir, ".config", "claude", "claude_desktop_config.json")
-	case "linux":
-		// XDG config directory
-		if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
-			return filepath.Join(xdgConfig, "claude", "claude_desktop_config.json")
-		}
-		return filepath.Join(homeDir, ".config", "claude", "claude_desktop_config.json")
-	case "windows":
-		// Windows location
-		if appData := os.Getenv("APPDATA"); appData != "" {
-			return filepath.Join(appData, "Claude", "claude_desktop_config.json")
-		}
-		return filepath.Join(homeDir, "AppData", "Roaming", "Claude", "claude_desktop_config.json")
-	default:
-		// Fallback
-		return filepath.Join(homeDir, ".claude", "claude_desktop_config.json")
-	}
+	return filepath.Join(homeDir, ".claude.json")
 }
 
 // SupportsSymlinks returns whether Claude config can be symlinked
 func (c *ClaudeConfigTranslator) SupportsSymlinks() bool {
-	// Claude Desktop reads the config file directly, so symlinking could work
-	// but it's safer to write the actual file
 	return false
 }

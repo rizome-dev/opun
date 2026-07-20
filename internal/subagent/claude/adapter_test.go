@@ -29,15 +29,15 @@ import (
 
 func TestClaudeAdapter_Creation(t *testing.T) {
 	config := core.SubAgentConfig{
-		Name:        "claude-test-agent",
-		Type:        core.SubAgentTypeDeclarative,
-		Provider:    core.ProviderTypeClaude,
-		Model:       "sonnet",
-		Description: "Test Claude agent",
+		Name:         "claude-test-agent",
+		Type:         core.SubAgentTypeDeclarative,
+		Provider:     core.ProviderTypeClaude,
+		Model:        "sonnet",
+		Description:  "Test Claude agent",
 		Capabilities: []string{"code", "analysis", "testing"},
-		Strategy:    core.DelegationAutomatic,
-		MaxRetries:  3,
-		Timeout:     time.Minute * 5,
+		Strategy:     core.DelegationAutomatic,
+		MaxRetries:   3,
+		Timeout:      time.Minute * 5,
 	}
 
 	adapter := NewClaudeAdapter(config)
@@ -48,6 +48,7 @@ func TestClaudeAdapter_Creation(t *testing.T) {
 }
 
 func TestClaudeAdapter_Initialize(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	adapter := NewClaudeAdapter(core.SubAgentConfig{
 		Name:     "test",
 		Provider: core.ProviderTypeClaude,
@@ -55,9 +56,9 @@ func TestClaudeAdapter_Initialize(t *testing.T) {
 
 	t.Run("Initialize with valid config", func(t *testing.T) {
 		config := core.SubAgentConfig{
-			Name:        "initialized-agent",
-			Provider:    core.ProviderTypeClaude,
-			Model:       "opus",
+			Name:         "initialized-agent",
+			Provider:     core.ProviderTypeClaude,
+			Model:        "opus",
 			Capabilities: []string{"advanced"},
 		}
 
@@ -337,29 +338,35 @@ type MockClaudeProvider struct {
 	typ  core.ProviderType
 }
 
-func (m *MockClaudeProvider) Name() string                                       { return m.name }
-func (m *MockClaudeProvider) Type() core.ProviderType                            { return m.typ }
-func (m *MockClaudeProvider) Initialize(config core.ProviderConfig) error        { return nil }
-func (m *MockClaudeProvider) Validate() error                                    { return nil }
-func (m *MockClaudeProvider) GetPTYCommand() (*exec.Cmd, error)                  { return exec.Command("echo"), nil }
-func (m *MockClaudeProvider) GetPTYCommandWithPrompt(prompt string) (*exec.Cmd, error) { return exec.Command("echo", prompt), nil }
-func (m *MockClaudeProvider) Features() core.ProviderFeatures                    { return core.ProviderFeatures{} }
-func (m *MockClaudeProvider) SupportsModel(model string) bool                    { return true }
+func (m *MockClaudeProvider) Name() string                                { return m.name }
+func (m *MockClaudeProvider) Type() core.ProviderType                     { return m.typ }
+func (m *MockClaudeProvider) Initialize(config core.ProviderConfig) error { return nil }
+func (m *MockClaudeProvider) Validate() error                             { return nil }
+func (m *MockClaudeProvider) GetPTYCommand() (*exec.Cmd, error)           { return exec.Command("echo"), nil }
+func (m *MockClaudeProvider) GetPTYCommandWithPrompt(prompt string) (*exec.Cmd, error) {
+	return exec.Command("echo", prompt), nil
+}
+func (m *MockClaudeProvider) Features() core.ProviderFeatures                            { return core.ProviderFeatures{} }
+func (m *MockClaudeProvider) SupportsModel(model string) bool                            { return true }
 func (m *MockClaudeProvider) PrepareSession(ctx context.Context, sessionID string) error { return nil }
 func (m *MockClaudeProvider) CleanupSession(ctx context.Context, sessionID string) error { return nil }
-func (m *MockClaudeProvider) GetReadyPattern() string                            { return "ready" }
-func (m *MockClaudeProvider) GetOutputPattern() string                           { return "output" }
-func (m *MockClaudeProvider) GetErrorPattern() string                            { return "error" }
-func (m *MockClaudeProvider) GetPromptInjectionMethod() string                   { return "clipboard" }
-func (m *MockClaudeProvider) InjectPrompt(prompt string) error                   { return nil }
-func (m *MockClaudeProvider) GetMCPServers() []core.MCPServer                    { return []core.MCPServer{} }
-func (m *MockClaudeProvider) GetTools() []core.Tool                              { return []core.Tool{} }
-func (m *MockClaudeProvider) GetSlashCommands() []core.SharedSlashCommand        { return []core.SharedSlashCommand{} }
-func (m *MockClaudeProvider) GetPlugins() []core.PluginReference                 { return []core.PluginReference{} }
-func (m *MockClaudeProvider) SupportsSlashCommands() bool                        { return false }
-func (m *MockClaudeProvider) GetSlashCommandDirectory() string                   { return "" }
-func (m *MockClaudeProvider) GetSlashCommandFormat() string                      { return "" }
-func (m *MockClaudeProvider) PrepareSlashCommands(commands []core.SharedSlashCommand, targetDir string) error { return nil }
+func (m *MockClaudeProvider) GetReadyPattern() string                                    { return "ready" }
+func (m *MockClaudeProvider) GetOutputPattern() string                                   { return "output" }
+func (m *MockClaudeProvider) GetErrorPattern() string                                    { return "error" }
+func (m *MockClaudeProvider) GetPromptInjectionMethod() string                           { return "clipboard" }
+func (m *MockClaudeProvider) InjectPrompt(prompt string) error                           { return nil }
+func (m *MockClaudeProvider) GetMCPServers() []core.MCPServer                            { return []core.MCPServer{} }
+func (m *MockClaudeProvider) GetTools() []core.Tool                                      { return []core.Tool{} }
+func (m *MockClaudeProvider) GetSlashCommands() []core.SharedSlashCommand {
+	return []core.SharedSlashCommand{}
+}
+func (m *MockClaudeProvider) GetPlugins() []core.PluginReference { return []core.PluginReference{} }
+func (m *MockClaudeProvider) SupportsSlashCommands() bool        { return false }
+func (m *MockClaudeProvider) GetSlashCommandDirectory() string   { return "" }
+func (m *MockClaudeProvider) GetSlashCommandFormat() string      { return "" }
+func (m *MockClaudeProvider) PrepareSlashCommands(commands []core.SharedSlashCommand, targetDir string) error {
+	return nil
+}
 
 // Benchmark tests
 func BenchmarkClaudeAdapter_TaskAdaptation(b *testing.B) {
